@@ -36,3 +36,5 @@ def get_vols(label_data, ids=[], do_save=False, write_file="", do_hist=False):
 	unique_ids = unique_ids[ids_sorted]
 	counts = counts[ids_sorted]
 	return (unique_ids, counts)
+
+#TODO (Jeff): Add get_areas function, should return area vs z
