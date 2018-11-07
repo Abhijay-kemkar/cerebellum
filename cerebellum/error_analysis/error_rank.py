@@ -102,6 +102,27 @@ def IoU_rank(seg_gt, seg_p, skip_ids=[], Ngt=None, Vmin=0, do_save=False, write_
         np.save(write_file, results)
     return id_calc, iou, best_pred
 
+def calc_vi(seg_gt, seg_p, fix_ids=None):
+    """
+    Calculates VI between two segmentations
+    
+    Args:
+        seg_gt (ndarray): GT segmentation
+        seg_p (ndarray): predicted segmentation
+        fix_ids (list of ints): apply oracle to these IDs in GT segmentation
+    Returns:
+        vi_split_oracle, vi_merge_oracle
+    """
+    seg_oracle = seg_p.copy()
+    max_id = np.max(seg_gt) + 1
+    if fix_ids is not None:
+        for i in range(len(fix_ids)):
+            seg_oracle[seg_gt==fix_ids[i]] = max_id # oracle for this GT object
+            max_id += 1
+    vi_split_oracle, vi_merge_oracle = CremiEvaluate(seg_oracle.astype(np.int), seg_gt.astype(np.int))
+    del seg_oracle
+    return vi_split_oracle, vi_merge_oracle
+
 def vi_rank(seg_gt, seg_p, iou_results, iou_max=0.7, do_save=True, write_file=""):
     """
     Ranks GT segments in order of their contribution to VI error
