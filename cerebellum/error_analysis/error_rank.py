@@ -47,6 +47,28 @@ def pred_fails(seg_gt, seg_p, do_save=False, write_file=""):
         np.save(write_file, fails)
     return np.array(fails)
 
+def union_count(seg_gt, seg_p, gt_id, p_id, return_order=False):
+    """
+    Returns voxel count in union of a GT object and prediction object
+    Args:
+        seg_gt (ndarray): GT segmentation
+        seg_p (ndarray): predicted segmentation
+        gt_id (int): GT object of interest
+        p_id (int): pred object of interest
+        return_order (bool): True if you wish to return which object is larger
+    Returns:
+        uc (int)
+        order (bool, optional)
+    """
+    gt_obj = np.ravel_multi_index(np.where(seg_gt==gt_id),seg_gt.shape)
+    pred_obj = np.ravel_multi_index(np.where(seg_p==p_id),seg_p.shape)
+    uc = len(np.union1d(gt_obj, pred_obj))
+    if return_order:
+        order = len(gt_obj)>len(pred_obj)
+        return uc, order
+    else:
+        return uc
+
 def IoU_rank(seg_gt, seg_p, skip_ids=[], Ngt=None, Vmin=0, do_save=False, write_file=""):
     """
     Ranks GT segments in decreasing order of prediction error
@@ -63,11 +85,6 @@ def IoU_rank(seg_gt, seg_p, skip_ids=[], Ngt=None, Vmin=0, do_save=False, write_
     Returns:
         id_calc (ndarray), iou (ndarray), bestpred (ndarray): GT ids, IoU, best prediction ID
     """
-    def union_count(seg_gt, seg_p, gt_id, p_id):
-        """returns voxel count in union of a GT object and prediction object"""
-        return len(np.union1d(np.ravel_multi_index(np.where(seg_gt==gt_id),seg_gt.shape), 
-            np.ravel_multi_index(np.where(seg_p==p_id),seg_p.shape)))
-
     # get GT segments
     seg_gt_id, seg_gt_cc = get_vols(seg_gt)
     seg_gt_id = seg_gt_id[1:] # delete segment 0
@@ -101,6 +118,28 @@ def IoU_rank(seg_gt, seg_p, skip_ids=[], Ngt=None, Vmin=0, do_save=False, write_
         results = np.vstack((id_calc, iou, best_pred))
         np.save(write_file, results)
     return id_calc, iou, best_pred
+
+def slice_iou(last_slice, first_slice):
+    """
+    Generates IoU scores of all objects across two slices
+    
+    Args:
+        last_slice (ndarray 1 x X x Y): objects in this slice are compared
+        first_slice (ndarray 1 x X x Y): against objects in this slice
+    """
+    n_objs = np.max(last_slice)
+    ints = np.zeros(n_objs)
+    unions = np.zeros(n_objs)
+    orders = np.zeros(n_objs)
+    ious = np.zeros(n_objs)
+    for i in range(n_objs):
+        if len(np.flatnonzero(last_slice==i))==0: # no voxels of this object in the slice
+            continue
+        front_ids, front_vols = intersection(last_slice, first_slice, i)
+        ints[i] = front_vols[0]
+        unions[i], orders[i] = union_count(last_slice, first_slice, i, front_ids[0], return_order=True)
+        ious[i] = float(ints[i])/unions[i]
+    return ints, unions, ious, orders
 
 def calc_vi(seg_gt, seg_p, fix_ids=None):
     """
