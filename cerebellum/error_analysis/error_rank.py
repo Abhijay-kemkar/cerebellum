@@ -114,8 +114,8 @@ def calc_vi(seg_gt, seg_p, fix_ids=None):
         vi_split_oracle, vi_merge_oracle
     """
     seg_oracle = seg_p.copy()
-    max_id = np.max(seg_gt) + 1
     if fix_ids is not None:
+        max_id = np.max(seg_p) + 1
         for i in range(len(fix_ids)):
             seg_oracle[seg_gt==fix_ids[i]] = max_id # oracle for this GT object
             max_id += 1
