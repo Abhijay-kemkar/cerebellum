@@ -127,6 +127,7 @@ def slice_iou(last_slice, first_slice):
         last_slice (ndarray 1 x X x Y): objects in this slice are compared
         first_slice (ndarray 1 x X x Y): against objects in this slice
     """
+    start_time = time.time()
     n_objs = np.max(last_slice)
     ints = np.zeros(n_objs)
     unions = np.zeros(n_objs)
@@ -139,7 +140,7 @@ def slice_iou(last_slice, first_slice):
         ints[i] = front_vols[0]
         unions[i], orders[i] = union_count(last_slice, first_slice, i, front_ids[0], return_order=True)
         ious[i] = float(ints[i])/unions[i]
-    return ints, unions, ious, orders
+    return ints, unions, ious, orders, time.time()-start_time
 
 def calc_vi(seg_gt, seg_p, fix_ids=None):
     """
