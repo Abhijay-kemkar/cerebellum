@@ -1,5 +1,6 @@
 import h5py
 import numpy as np
+import os
 
 def writeh5(filename, datasetname, array, compression=None, chunks=None):
     """
@@ -27,3 +28,9 @@ def read3d_h5(filename, datasetname, dsmpl=(1,1,1), block_lims=3*((None,None),))
     array = np.array(ds[read_slice])
     fid.close()
     return array
+
+def create_folder(fpath):
+    if not os.path.isdir(fpath):
+            os.mkdir(fpath)
+    else:
+        pass
