@@ -51,6 +51,7 @@ class SegPrep(object):
         log.write("[%d:%d, %d:%d, %d:%d]\n"%(block_lims[0][0], block_lims[0][1], block_lims[1][0], block_lims[1][1], block_lims[2][0], block_lims[2][1]))
         log.close()
 
+    #TODO - add timing decorator
     #@TimingDecorators.print_runtime
     def relabel(self):
         """
