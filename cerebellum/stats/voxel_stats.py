@@ -11,7 +11,7 @@ def get_vols(label_data, ids=[], do_save=False, write_file="", do_hist=False):
 	"""
 	Returns voxel count of requested ids in segmentation
 	Args:
-		label_data (ndarray): input degmentation
+		label_data (ndarray): input segmentation
 		ids (list of ints)
 		do_save (bool): flag to save result
 		write_file (string): path to write result
