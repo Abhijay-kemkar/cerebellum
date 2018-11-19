@@ -22,6 +22,7 @@ def get_vols(label_data, ids=[], do_save=False, write_file="", do_hist=False):
 	if len(ids)==0:
 		unique_ids, counts = np.unique(label_data, return_counts=True)
 	else:
+		unique_ids = ids
 		counts = [np.count_nonzero(label_data==id) for id in ids]
 	if do_save:
 		vols = np.array(zip(ids, counts), np.dtype(int,int))

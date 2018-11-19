@@ -2,14 +2,15 @@ import numpy as np
 import h5py
 import time
 from em_segLib.seg_eval import CremiEvaluate
-from volhist import get_vols
+
+from cerebellum.stats.voxel_stats import get_vols
 
 """
 Functions to identify and rank errors in predicted segmentation
 """
 #TODO: Make all functions more efficient by adding option for bounding box info
 
-def intersection(seg_gt, seg_p, gt_id):
+def intersection_list(seg_gt, seg_p, gt_id):
     """
     Finds all objects in predicted segmentation overlapping with a GT object
 
@@ -40,7 +41,7 @@ def pred_fails(seg_gt, seg_p, do_save=False, write_file=""):
     gt_ids, gt_vols = get_vols(seg_gt)
     fails = []
     for i in range(1,len(gt_ids)): # skip segment 0
-        pred_ids, pred_vols = intersection(seg_gt, seg_p, gt_ids[i])
+        pred_ids, pred_vols = intersection_list(seg_gt, seg_p, gt_ids[i])
         if pred_ids[0]==0:
             fails.append(gt_ids[i])
     if do_save:
@@ -69,7 +70,7 @@ def union_count(seg_gt, seg_p, gt_id, p_id, return_order=False):
     else:
         return uc
 
-def IoU_rank(seg_gt, seg_p, skip_ids=[], Ngt=None, Vmin=0, do_save=False, write_file=""):
+def iou_rank(seg_gt, seg_p, skip_ids=[], Ngt=None, Vmin=0, do_save=False, write_file=""):
     """
     Ranks GT segments in decreasing order of prediction error
 
@@ -101,7 +102,7 @@ def IoU_rank(seg_gt, seg_p, skip_ids=[], Ngt=None, Vmin=0, do_save=False, write_
     iou = np.zeros(num_calc)
     best_pred = np.zeros(num_calc)
     for i in range(num_calc):
-        pred_ids, pred_vols = intersection(seg_gt, seg_p, id_calc[i])
+        pred_ids, pred_vols = intersection_list(seg_gt, seg_p, id_calc[i])
         # remove background voxels from intersection
         pred_ids = pred_ids[np.nonzero(pred_ids)]
         pred_vols = pred_vols[np.nonzero(pred_ids)]
@@ -117,7 +118,7 @@ def IoU_rank(seg_gt, seg_p, skip_ids=[], Ngt=None, Vmin=0, do_save=False, write_
     if do_save:
         results = np.vstack((id_calc, iou, best_pred))
         np.save(write_file, results)
-    return id_calc, iou, best_pred
+    return results
 
 def slice_iou(last_slice, first_slice):
     """
@@ -136,7 +137,7 @@ def slice_iou(last_slice, first_slice):
     for i in range(n_objs):
         if len(np.flatnonzero(last_slice==i))==0: # no voxels of this object in the slice
             continue
-        front_ids, front_vols = intersection(last_slice, first_slice, i)
+        front_ids, front_vols = intersection_list(last_slice, first_slice, i)
         ints[i] = front_vols[0]
         unions[i], orders[i] = union_count(last_slice, first_slice, i, front_ids[0], return_order=True)
         ious[i] = float(ints[i])/unions[i]
@@ -206,4 +207,4 @@ def vi_rank(seg_gt, seg_p, iou_results, iou_max=0.7, do_save=True, write_file=""
     if do_save:
         results = np.vstack((id_calc, deltaVI.transpose()))
         np.save(write_file, results)
-    return id_calc, deltaVI
+    return results
