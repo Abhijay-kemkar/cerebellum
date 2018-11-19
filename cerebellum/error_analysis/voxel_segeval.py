@@ -24,19 +24,14 @@ class VoxEval(object):
         self.pred = read3d_h5('./segs/' + pred_name + '/seg.h5', 'main')
         self.pred[self.gt==0] = 0 # zero voxels that are unlabeled in GT
         self.results_folder = './err-analysis/' + pred_name
-        self.missing_objs = None
-        self.iou_results = None
-        self.delta_vis = None
-
-        try:
-            assert all([(d1==d2) for d1, d2 in zip(self.gt.shape, self.pred.shape)])
-        except:
-            print "GT and pred arrays have different dimensions"
-        create_folder('./err-analysis/')
-        create_folder(self.results_folder)
-        log = open("./logs/" + self.pred_name +'.log', "a+")
-        log.write("initialized voxel based evaluation against " + gt_name + "\n\n")
-        log.close()
+        self.missing_objs = read_npy(self.results_folder+'/missing-objs.npy')
+        self.iou_results = read_npy(self.results_folder+'/iou_results.npy')
+        self.delta_vis = read_npy(self.results_folder+'/vi_scores.npy')
+        if self.missing_objs is None:
+            create_folder(self.results_folder)
+            log = open("./logs/" + self.pred_name +'.log', "a+")
+            log.write("initialized voxel based evaluation against " + gt_name + "\n\n")
+            log.close()
 
     def find_misses(self):
         """finds GT objects missing in pred, removes them for further evaluation methods"""
@@ -51,7 +46,12 @@ class VoxEval(object):
         log.close()
 
     def find_ious(self, print_thresh=0.7, show_hist=False):
-        """finds IoU scores of all objects in segmentation"""
+        """
+        finds IoU scores of all objects in segmentation
+        Args:
+            print_thresh (float): print # objects with IoU below this threshold
+            show_hist (bool): flag to show histogram of all IoU scores
+        """
         self.iou_results = iou_rank(self.gt, self.pred, 
                                      Ngt=None, do_save=True, 
                                      write_file=self.results_folder+"/iou_results")
@@ -70,19 +70,24 @@ class VoxEval(object):
         log.write("%d\n"%(print_count))
         log.close()
 
-    def find_delta_vis(self, iou_max=0.7):
-        """runs deltaVI calculation"""
+    def find_delta_vis(self, iou_max=0.7, hist_segs=15):
+        """
+        runs deltaVI calculation
+        Args:
+            iou_max (float): run delta_VI calculation for all segments with IoU score below this threshold
+            hist_segs (int): number of segments in delta_VI histogram
+        """
         self.delta_vis = vi_rank(self.gt, self.pred, self.iou_results, 
                                  iou_max=iou_max, do_save=True, 
                                  write_file=self.results_folder+"/vi_scores")
         gt_vi = self.delta_vis[0,:]
         deltaVI = self.delta_vis[1:,:]
-        n_segs = min(15, deltaVI.shape[0])
+        n_segs = min(hist_segs, deltaVI.shape[1])
         ind = np.arange(n_segs)
         width = 0.5
         fig, ax = plt.subplots(1)
         psplit = ax.bar(ind, deltaVI[0,:n_segs], width, color='#d62728')
-        pmerge = ax.bar(ind, deltaVI[1,:n_segs], width, bottom=deltaVI[:n_segs,0])
+        pmerge = ax.bar(ind, deltaVI[1,:n_segs], width, bottom=deltaVI[0,:n_segs])
         plt.ylabel('delta_VI')
         plt.xlabel('GT id of segment')
         plt.title('Objects with highest delta_VI')
@@ -94,3 +99,26 @@ class VoxEval(object):
         log = open("./logs/" + self.pred_name +'.log', "a+")
         log.write("delta_VI calculation complete for objects with IoU score below %f\n\n"%(iou_max))
         log.close()
+
+    def run_fullsuite(self, iou_max=0.7, overwrite_prev=False):
+        """
+        runs all voxel evaluation methods
+        Args:
+            iou_max (float): run delta_VI calculation for all segments with IoU score below this threshold
+            overwrite_prev (bool): overwrite previous results if any
+        """
+        if self.missing_objs is None or overwrite_prev:
+            print "Starting missing object evaluation"
+            self.find_misses()
+        else:
+            print "Missing object results loaded"
+        if self.iou_results is None or overwrite_prev:
+            print "Starting IoU evaluation"
+            self.find_ious(print_thresh=iou_max)
+        else:
+            print "IoU results loaded"
+        if self.delta_vis is None or overwrite_prev:
+            print "Starting delta VI evaluation"
+            self.find_delta_vis(iou_max=iou_max)
+        else:
+            print "delta_VI results loaded"

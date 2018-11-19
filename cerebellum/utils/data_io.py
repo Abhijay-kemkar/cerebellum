@@ -34,3 +34,9 @@ def create_folder(fpath):
             os.mkdir(fpath)
     else:
         pass
+
+def read_npy(filename):
+    if os.path.exists(filename):
+        return np.load(filename)
+    else:
+        return None
