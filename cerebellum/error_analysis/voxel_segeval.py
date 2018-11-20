@@ -36,13 +36,17 @@ class VoxEval(object):
             log.write("initialized voxel based evaluation against " + gt_name + "\n\n")
             log.close()
 
+    def remove_from_gt(self, ids):
+        """zeros voxel values of all GT objects listed in ids"""
+        for i in ids:
+            self.gt[self.gt==i] = 0
+
     def find_misses(self):
         """finds GT objects missing in pred, removes them for further evaluation methods"""
         self.missing_objs = pred_fails(self.gt, self.pred, do_save=True, 
                                         write_file=self.results_folder+'/missing-objs')
         print "Found %d GT objects completely missing"%(self.missing_objs.size)
-        for i in self.missing_objs.tolist():
-            self.gt[self.gt==i] = 0
+        self.remove_from_gt(self.missing_objs.tolist())
         log = open("./logs/" + self.pred_name +'.log', "a+")
         log.write("missing object count\n")
         log.write("%d\n"%(self.missing_objs.size))
@@ -50,6 +54,7 @@ class VoxEval(object):
 
     def find_vi(self):
         """finds VI of pred against GT"""
+        self.remove_from_gt(self.missing_objs.tolist())
         self.vi = calc_vi(self.gt, self.pred, do_save=True, write_file=self.results_folder+'/vi.json')
         print "VI split, VI merge: %f, %f"%(self.vi[0], self.vi[1])
         log = open("./logs/" + self.pred_name +'.log', "a+")
@@ -64,6 +69,7 @@ class VoxEval(object):
             print_thresh (float): print # objects with IoU below this threshold
             show_hist (bool): flag to show histogram of all IoU scores
         """
+        self.remove_from_gt(self.missing_objs.tolist())
         self.iou_results = iou_rank(self.gt, self.pred, 
                                      Ngt=None, do_save=True, 
                                      write_file=self.results_folder+"/iou_results")
@@ -89,6 +95,7 @@ class VoxEval(object):
             iou_max (float): run delta_VI calculation for all segments with IoU score below this threshold
             hist_segs (int): number of segments in delta_VI histogram
         """
+        self.remove_from_gt(self.missing_objs.tolist())
         self.delta_vis = vi_rank(self.gt, self.pred, self.iou_results, 
                                  iou_max=iou_max, do_save=True, 
                                  write_file=self.results_folder+"/vi_scores")
