@@ -1,10 +1,11 @@
+import json
 import matplotlib.pyplot as plt
 
 from voxel_methods import *
 from cerebellum.utils.data_io import *
 
 class VoxEval(object):
-    """Methods for voxel based evaluation of segmentations"""
+    """High level methods for voxel based evaluation of segmentations"""
     def __init__(self, gt_name, pred_name):
         """
         Attributes:
@@ -25,8 +26,10 @@ class VoxEval(object):
         self.pred[self.gt==0] = 0 # zero voxels that are unlabeled in GT
         self.results_folder = './err-analysis/' + pred_name
         self.missing_objs = read_npy(self.results_folder+'/missing-objs.npy')
+        self.vi = read_json(self.results_folder+'/vi.json')
         self.iou_results = read_npy(self.results_folder+'/iou_results.npy')
         self.delta_vis = read_npy(self.results_folder+'/vi_scores.npy')
+        print "Starting voxel evaluation methods for " + pred_name + " against " + gt_name
         if self.missing_objs is None:
             create_folder(self.results_folder)
             log = open("./logs/" + self.pred_name +'.log', "a+")
@@ -43,6 +46,15 @@ class VoxEval(object):
         log = open("./logs/" + self.pred_name +'.log', "a+")
         log.write("missing object count\n")
         log.write("%d\n"%(self.missing_objs.size))
+        log.close()
+
+    def find_vi(self):
+        """finds VI of pred against GT"""
+        self.vi = calc_vi(self.gt, self.pred, do_save=True, write_file=self.results_folder+'/vi.json')
+        print "VI split, VI merge: %f, %f"%(self.vi[0], self.vi[1])
+        log = open("./logs/" + self.pred_name +'.log', "a+")
+        log.write("VI calculation completed\n")
+        log.write("%f, %f\n"%(self.vi[0], self.vi[1]))
         log.close()
 
     def find_ious(self, print_thresh=0.7, show_hist=False):
@@ -102,7 +114,8 @@ class VoxEval(object):
 
     def run_fullsuite(self, iou_max=0.7, overwrite_prev=False):
         """
-        runs all voxel evaluation methods
+        Runs all voxel evaluation methods. If previously run, loads existing results
+
         Args:
             iou_max (float): run delta_VI calculation for all segments with IoU score below this threshold
             overwrite_prev (bool): overwrite previous results if any
@@ -112,6 +125,11 @@ class VoxEval(object):
             self.find_misses()
         else:
             print "Missing object results loaded"
+        if self.vi is None or overwrite_prev:
+            print "Starting VI evaluation"
+            self.find_vi()
+        else:
+            print "VI loaded"
         if self.iou_results is None or overwrite_prev:
             print "Starting IoU evaluation"
             self.find_ious(print_thresh=iou_max)
@@ -122,3 +140,10 @@ class VoxEval(object):
             self.find_delta_vis(iou_max=iou_max)
         else:
             print "delta_VI results loaded"
+
+    def get_vi(self):
+        """returns VI as tuple of two floats: (VI split, VI merge)"""
+        try:
+            return (self.vi["VI split"], self.vi["VI merge"])
+        except:
+            print "Error retrieving VI because VI calculation has not been run yet"

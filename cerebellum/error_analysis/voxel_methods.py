@@ -1,6 +1,7 @@
 import numpy as np
 import h5py
 import time
+import json
 from em_segLib.seg_eval import CremiEvaluate
 
 from cerebellum.stats.voxel_stats import get_vols
@@ -143,7 +144,7 @@ def slice_iou(last_slice, first_slice):
         ious[i] = float(ints[i])/unions[i]
     return ints, unions, ious, orders, time.time()-start_time
 
-def calc_vi(seg_gt, seg_p, fix_ids=None):
+def calc_vi(seg_gt, seg_p, fix_ids=None, do_save=False, write_file=""):
     """
     Calculates VI between two segmentations
     
@@ -151,6 +152,8 @@ def calc_vi(seg_gt, seg_p, fix_ids=None):
         seg_gt (ndarray): GT segmentation
         seg_p (ndarray): predicted segmentation
         fix_ids (list of ints): apply oracle to these IDs in GT segmentation
+        do_save (bool): flag to save results
+        write_file (str): path for result .json file
     Returns:
         vi_split_oracle, vi_merge_oracle
     """
@@ -162,9 +165,13 @@ def calc_vi(seg_gt, seg_p, fix_ids=None):
             max_id += 1
     vi_split_oracle, vi_merge_oracle = CremiEvaluate(seg_oracle.astype(np.int), seg_gt.astype(np.int))
     del seg_oracle
+    if do_save:
+        vi_dict = {"VI split": vi_split_oracle, "VI merge": vi_merge_oracle}
+        with open(write_file, 'w') as out:
+                json.dump(vi_dict, out)
     return vi_split_oracle, vi_merge_oracle
 
-def vi_rank(seg_gt, seg_p, iou_results, iou_max=0.7, do_save=True, write_file=""):
+def vi_rank(seg_gt, seg_p, iou_results, iou_max=0.7, do_save=False, write_file=""):
     """
     Ranks GT segments in order of their contribution to VI error
 

@@ -1,6 +1,7 @@
 import h5py
 import numpy as np
 import os
+import json
 
 def writeh5(filename, datasetname, array, compression=None, chunks=None):
     """
@@ -38,5 +39,13 @@ def create_folder(fpath):
 def read_npy(filename):
     if os.path.exists(filename):
         return np.load(filename)
+    else:
+        return None
+
+def read_json(filename):
+    if os.path.exists(filename):
+        with open(filename) as f:
+            data = json.load(f)
+        return data
     else:
         return None
