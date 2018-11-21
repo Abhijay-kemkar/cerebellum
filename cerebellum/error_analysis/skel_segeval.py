@@ -66,8 +66,8 @@ class SkelEval(object):
                 merge_strs = f.readlines()[1::2]
                 merge_ids = 2*len(merge_strs)*[0]
                 for i, mstr in enumerate(merge_strs):
-                    merge_ids[i] = int(mstr.split(',')[0])
-                    merge_ids[i+1] = int(mstr.split(',')[1])
+                    merge_ids[2*i] = int(mstr.split(',')[0])
+                    merge_ids[2*i+1] = int(mstr.split(',')[1])
             else:
                 print "Error: look_in must equal either 'gt' or 'pred'"
                 return
