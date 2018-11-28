@@ -42,20 +42,20 @@ class SegPrep(object):
         """
         self.data = read3d_h5(filename, datasetname, dsmpl=dsmpl, block_lims=block_lims)
         self.shape = list(self.data.shape)
-        log = open("./logs/" + self.name +'.log', "a+")
-        log.write("read from parent file\n")
-        log.write(os.path.abspath(filename)+'\n')
-        log.write("downsampling factor from parent file\n")
-        log.write("%dx%dx%d\n"%(dsmpl[0], dsmpl[1], dsmpl[2]))
-        log.write("slices read from parent file\n")
-        log.write("[%d:%d, %d:%d, %d:%d]\n"%(block_lims[0][0], block_lims[0][1], block_lims[1][0], block_lims[1][1], block_lims[2][0], block_lims[2][1]))
-        log.close()
+        # log = open("./logs/" + self.name +'.log', "a+")
+        # log.write("read from parent file\n")
+        # log.write(os.path.abspath(filename)+'\n')
+        # log.write("downsampling factor from parent file\n")
+        # log.write("%dx%dx%d\n"%(dsmpl[0], dsmpl[1], dsmpl[2]))
+        # log.write("slices read from parent file\n")
+        # log.write("[%d:%d, %d:%d, %d:%d]\n"%(block_lims[0][0], block_lims[0][1], block_lims[1][0], block_lims[1][1], block_lims[2][0], block_lims[2][1]))
+        # log.close()
 
     #TODO - add timing decorator
     #@TimingDecorators.print_runtime
-    def relabel(self):
+    def relabel(self, id_map=None, print_labels=False):
         """
-        Relabels the segmentation data such that max ID = # objects - 1
+        Relabels the segmentation data such that max ID = # objects - 1 or according to supplied ID map
         """
         log = open("./logs/" + self.name +'.log', "a+")
         log.write("relabeled flag\n")
@@ -66,40 +66,68 @@ class SegPrep(object):
             log.write("False\n")
             log.close()
         else:
-            missing_ids = np.sort(np.array(list(set(range(max_id+1)).difference(set(seg_ids)))))
-            id_map = seg_ids
-            for i in range(len(missing_ids)):
-                if i==len(missing_ids)-1:
-                    ids_to_correct = range(missing_ids[i]+1, max_id+1)
-                else:
-                    ids_to_correct = range(missing_ids[i]+1, missing_ids[i+1])
-                for j in ids_to_correct:
-                    self.data[self.data==j] = j-(i+1) #TODO (Jeff): speed this up using object-wise bounding boxes
-                    id_map[j-(i+1)] = j
-            log.write("True\n")
-            log.close()
-            create_folder('./segs/')
-            create_folder('./segs/' + self.name)
-            idout = "./segs/" + self.name + "/relabeling-map.npy"
-            np.save(idout, id_map)
+            if id_map is not None: # eg: generated previously from lower res data
+                for i in seg_ids: # extend ID map to missing old IDs
+                    if i not in id_map.tolist():
+                        id_map = np.append(id_map, [i])
+                assert n_ids == len(id_map)
+                for new_id, old_id in enumerate(id_map.tolist()):
+                    if print_labels: print "%d -> %d"%(new_id, old_id)
+                    self.data[self.data==old_id] = new_id
+                log.write("True\n")
+                log.close()
+                create_folder('./segs/')
+                create_folder('./segs/' + self.name)
+                idout = "./segs/" + self.name + "/relabeling-map.npy"
+                np.save(idout, id_map)
+            else:
+                missing_ids = np.sort(np.array(list(set(range(max_id+1)).difference(set(seg_ids)))))
+                id_map = seg_ids
+                for i in range(len(missing_ids)):
+                    if i==len(missing_ids)-1:
+                        ids_to_correct = range(missing_ids[i]+1, max_id+1)
+                    else:
+                        ids_to_correct = range(missing_ids[i]+1, missing_ids[i+1])
+                    for j in ids_to_correct:
+                        self.data[self.data==j] = j-(i+1) #TODO (Jeff): speed this up using object-wise bounding boxes
+                        id_map[j-(i+1)] = j
+                log.write("True\n")
+                log.close()
+                create_folder('./segs/')
+                create_folder('./segs/' + self.name)
+                idout = "./segs/" + self.name + "/relabeling-map.npy"
+                np.save(idout, id_map)
 
     def padzeros(self, nzeros, axis):
         """
         Pads zeros at end along chosen axis
         Args:
-            nzeros (int, int, int): number of zeros along each dimension
+            nzeros (int): number of zeros
             axis (int): axis along which zeros must be appended
         """
-        padding = np.zeros((nzeros[0], nzeros[1], nzeros[2]),dtype=np.uint32)
+        zero_dims = list(self.data.shape)
+        zero_dims[axis] = nzeros
+        padding = np.zeros(zero_dims,dtype=np.uint32)
         self.data = np.append(self.data, padding, axis=axis)
-        self.shape[axis] += nzeros[1]
+        self.shape = self.data.shape
         meta = open("./logs/" + self.name +'.log', "a+")
         log = open("./logs/" + self.name +'.log', "a+")
         log.write("zero-padded flag\n")
         log.close()
 
+    def swapaxes(self, axis1, axis2):
+        self.data = self.data.swapaxes(axis1, axis2)
+        self.shape = self.data.shape
+        res_swapped = [self.resolution[0], self.resolution[1], self.resolution[2]]
+        res_swapped[axis1], res_swapped[axis2] = res_swapped[axis2], res_swapped[axis1]
+        self.resolution = tuple(res_swapped)
+        # TO DO: Change meta file as well
+        log = open("./logs/" + self.name +'.log', "a+")
+        log.write("swapped axes %d and %d\n"%(axis1, axis2))
+
     def write(self):
         create_folder('./segs/')
+        create_folder('./segs/' + self.name)
         fout = './segs/' + self.name + "/seg.h5"
         writeh5(fout, 'main', self.data, compression="gzip", chunks=(1,self.data.shape[1],self.data.shape[2]))
         meta = open("./meta/" + self.name +'.meta', "a+")
