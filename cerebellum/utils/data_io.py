@@ -42,6 +42,9 @@ def read_npy(filename):
     else:
         return None
 
+def write_npy(arr, filename):
+    np.save(filename, arr)
+
 def read_json(filename):
     if os.path.exists(filename):
         with open(filename) as f:
@@ -49,3 +52,7 @@ def read_json(filename):
         return data
     else:
         return None
+
+def write_json(dictionary, filename):
+    with open(filename, 'w') as f:
+        data = json.dump(dictionary, f)

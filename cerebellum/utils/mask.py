@@ -14,7 +14,7 @@ def gen_mask(seg, obj_id):
 	return obj_mask
 
 def get_bbox(seg, obj_id):
-	regions = regionprops(gen_mask(seg, obj_id))
+	regions = regionprops(gen_mask(seg, obj_id), cache=True)
 	return regions[0].bbox
 
 def mask_in_bbox(seg, obj_id):
