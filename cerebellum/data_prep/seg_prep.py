@@ -1,8 +1,8 @@
 import os
 import numpy as np
 
-from data_io import *
-from timing import TimingDecorators
+from cerebellum.utils.data_io import *
+import time
 
 class SegPrep(object):
     """
@@ -22,7 +22,7 @@ class SegPrep(object):
         self.shape = None
         self.data = None
         self.seg_ids = None
-        self.max_id = None
+        self.n_ids = None
 
         create_folder('./meta/')
         meta = open("./meta/" + name +'.meta', "w")
@@ -61,12 +61,14 @@ class SegPrep(object):
         """
         log = open("./logs/" + self.name +'.log', "a+")
         log.write("relabeled flag\n")
+        start_time = time.time()
         if self.seg_ids is None:
             self.seg_ids = np.unique(self.data)
         if self.n_ids is None:
             self.n_ids = len(self.seg_ids)
-        max_id = np.max(seg_ids)
-        if max_id == n_ids-1:
+        print "Starting relabeling of %d objects"%(self.n_ids)
+        max_id = np.max(self.seg_ids)
+        if max_id == self.n_ids-1:
             log.write("False\n")
             log.close()
         else:
@@ -76,7 +78,7 @@ class SegPrep(object):
                         id_map = np.append(id_map, [i])
                 assert self.n_ids == len(id_map)
                 for new_id, old_id in enumerate(id_map.tolist()):
-                    if print_labels: print "%d -> %d"%(new_id, old_id)
+                    if print_labels: print "new ID: %d -> old ID: %d"%(new_id, old_id)
                     self.data[self.data==old_id] = new_id
                 log.write("True\n")
                 log.close()
@@ -85,7 +87,7 @@ class SegPrep(object):
                 idout = "./segs/" + self.name + "/relabeling-map.npy"
                 np.save(idout, id_map)
             else:
-                missing_ids = np.sort(np.array(list(set(range(max_id+1)).difference(set(seg_ids)))))
+                missing_ids = np.sort(np.array(list(set(range(max_id+1)).difference(set(self.seg_ids)))))
                 id_map = self.seg_ids
                 for i in range(len(missing_ids)):
                     if i==len(missing_ids)-1:
@@ -93,6 +95,7 @@ class SegPrep(object):
                     else:
                         ids_to_correct = range(missing_ids[i]+1, missing_ids[i+1])
                     for j in ids_to_correct:
+                        if print_labels: print "new ID: %d -> old ID: %d"%(j-(i+1), j)
                         self.data[self.data==j] = j-(i+1) #TODO (Jeff): speed this up using object-wise bounding boxes
                         id_map[j-(i+1)] = j
                 self.seg_ids = np.arange(self.n_ids)
@@ -102,6 +105,7 @@ class SegPrep(object):
                 create_folder('./segs/' + self.name)
                 idout = "./segs/" + self.name + "/relabeling-map.npy"
                 np.save(idout, id_map)
+        print "Relabeling time: %f"%(time.time()-start_time)
 
     def padzeros(self, nzeros, axis):
         """
