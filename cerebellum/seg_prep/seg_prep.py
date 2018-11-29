@@ -21,6 +21,8 @@ class SegPrep(object):
         self.resolution = res
         self.shape = None
         self.data = None
+        self.seg_ids = None
+        self.max_id = None
 
         create_folder('./meta/')
         meta = open("./meta/" + name +'.meta', "w")
@@ -59,8 +61,10 @@ class SegPrep(object):
         """
         log = open("./logs/" + self.name +'.log', "a+")
         log.write("relabeled flag\n")
-        seg_ids = np.unique(self.data)
-        n_ids = len(seg_ids)
+        if self.seg_ids is None:
+            self.seg_ids = np.unique(self.data)
+        if self.n_ids is None:
+            self.n_ids = len(self.seg_ids)
         max_id = np.max(seg_ids)
         if max_id == n_ids-1:
             log.write("False\n")
@@ -70,7 +74,7 @@ class SegPrep(object):
                 for i in seg_ids: # extend ID map to missing old IDs
                     if i not in id_map.tolist():
                         id_map = np.append(id_map, [i])
-                assert n_ids == len(id_map)
+                assert self.n_ids == len(id_map)
                 for new_id, old_id in enumerate(id_map.tolist()):
                     if print_labels: print "%d -> %d"%(new_id, old_id)
                     self.data[self.data==old_id] = new_id
@@ -82,7 +86,7 @@ class SegPrep(object):
                 np.save(idout, id_map)
             else:
                 missing_ids = np.sort(np.array(list(set(range(max_id+1)).difference(set(seg_ids)))))
-                id_map = seg_ids
+                id_map = self.seg_ids
                 for i in range(len(missing_ids)):
                     if i==len(missing_ids)-1:
                         ids_to_correct = range(missing_ids[i]+1, max_id+1)
@@ -91,6 +95,7 @@ class SegPrep(object):
                     for j in ids_to_correct:
                         self.data[self.data==j] = j-(i+1) #TODO (Jeff): speed this up using object-wise bounding boxes
                         id_map[j-(i+1)] = j
+                self.seg_ids = np.arange(self.n_ids)
                 log.write("True\n")
                 log.close()
                 create_folder('./segs/')
@@ -124,6 +129,13 @@ class SegPrep(object):
         # TO DO: Change meta file as well
         log = open("./logs/" + self.name +'.log', "a+")
         log.write("swapped axes %d and %d\n"%(axis1, axis2))
+
+    def gen_bboxes(self):
+        """generates bboxes for all objects in segmentation"""
+        pass
+
+    def filter_fibers(self):
+        pass
 
     def write(self):
         create_folder('./segs/')
