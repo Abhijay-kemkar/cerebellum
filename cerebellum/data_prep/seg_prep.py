@@ -120,6 +120,7 @@ class SegPrep(object):
         bbox_list = []
         for i, seg_id in enumerate(self.seg_ids.tolist()):
             bbox_list.append(get_bbox(self.data, seg_id))
+        self.bbox_dict = dict(zip(self.seg_ids, bbox_list))
         save_dict = dict(zip(["%d"%(i) for i in self.seg_ids], bbox_list))
         write_json(save_dict, './segs/'+self.name+'/bboxes.json')
         stop_msg =  "BBox evaluation time: %f\n"%(time.time()-start_time)
@@ -127,14 +128,18 @@ class SegPrep(object):
         log = open("./logs/" + self.name +'.log', "a+")
         log.write(stop_msg)
 
-    def read_bboxes(self):
+    def read_bboxes(self, external_path=None):
         """
         reads in previously evaluated bounding box information 
         """
         try:
-            self.bbox_dict = read_json('./segs/'+self.name+'/bboxes.json')
+            if external_path is None: # read from segs folder of the same segmentation
+                self.bbox_dict = read_json('./segs/'+self.name+'/bboxes.json')
+            else: # read externally, eg. bboxes computed form lower res segmentation
+                self.bbox_dict = read_json(external_path)
             for i, bbox in self.bbox_dict.items(): # convert str keys to int keys
-                self.bbox_dict[int(i)] = self.bbox_dict.pop(i)
+                    self.bbox_dict[int(i)] = self.bbox_dict.pop(i)
+            assert self.n_ids == len(self.bbox_dict.keys())
         except:
             print "Could not locate bounding box file"
 
