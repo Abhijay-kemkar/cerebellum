@@ -27,9 +27,12 @@ class SkelEval(object):
         self.gt_name = gt_name
         self.pred_name = pred_name
         self.gt_skeletons = ReadSkeletons(gt_name, read_edges=True, downsample_resolution=dsmpl_res)
-        if not filtered: self.pred = read3d_h5('./segs/' + pred_name + '/seg.h5', 'main')
-        if filtered: self.pred = read3d_h5('./segs/' + pred_name + '/filtered-seg.h5', 'main')
-        self.results_folder = './err-analysis/' + pred_name
+        if not filtered: 
+            self.pred = read3d_h5('./segs/' + pred_name + '/seg.h5', 'main')
+            self.results_folder = './err-analysis/' + pred_name
+        else:
+            self.pred = read3d_h5('./segs/' + pred_name + '/filtered-seg.h5', 'main')
+            self.results_folder = './err-analysis/' + pred_name + '/filtered/'
         create_folder(self.results_folder)
         self.sk_eval = None
 

@@ -100,8 +100,8 @@ class SkeletonEvaluation:
             assert skeleton.label == id_map.id_in
             pred_ids = id_map.ids_out
             # ignore splits that involve purely 0
-            if 0 in pred_ids:
-                pred_ids.remove(0)
+            # if 0 in pred_ids:
+            #     pred_ids.remove(0)
             if len(pred_ids) == 1 or (1.*pred_ids[0])/id_map.size_in > t_s:
                 return [pred_ids[0]]
             else:
