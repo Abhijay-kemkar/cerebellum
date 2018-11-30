@@ -54,7 +54,7 @@ class SkeletonEvaluation:
                 Lower t_m -> more merges detected
             t_s (float b/w 0 and 1): split threshold
                 A GT skeleton S is a split if its top predicted label covers <=t_s of its nodes.
-                Lower t_s -> more splits detected
+                Higher t_s -> more splits detected
         Attributes:
             title (str)
             n_skels (int): number of skeletons
@@ -99,10 +99,12 @@ class SkeletonEvaluation:
             """
             assert skeleton.label == id_map.id_in
             pred_ids = id_map.ids_out
+            pred_counts = id_map.counts_out
             # ignore splits that involve purely 0
-            # if 0 in pred_ids:
-            #     pred_ids.remove(0)
-            if len(pred_ids) == 1 or (1.*pred_ids[0])/id_map.size_in > t_s:
+            # TO DO: adding GT dilation option can allow us to relax this constraint
+            if 0 in pred_ids:
+                pred_ids.remove(0)
+            if len(pred_ids) == 1 or (1.*pred_counts[0])/id_map.size_in > t_s:
                 return [pred_ids[0]]
             else:
                 return pred_ids
@@ -131,6 +133,7 @@ class SkeletonEvaluation:
         self.categories = [None]*self.n_skels
         self.erl_pred = None
         self.erl_gt = None
+        self.omitted_list = []
         self.merge_list = []
         self.split_list = []
         self.corr_list = []
@@ -148,6 +151,7 @@ class SkeletonEvaluation:
                               and (1.*self.gt2pred[i].counts_out[0])/self.gt2pred[i].size_in > self.t_om)
             if omission_flag:
                 self.categories[i] = "omitted"
+                self.omitted_list.append(i)
                 continue
             # case: merged
             # check other skeletons in volume for potential merge
@@ -223,6 +227,11 @@ class SkeletonEvaluation:
                 json.dump(cat_counts, outfile)
     
     def write_errors(self, write_path):
+        # write omissions
+        f = open(write_path + "/omitted-skeletons.ids", "w")
+        f.write("%d\n"%(len(self.omitted_list))) # no of split skeletons
+        for om_item in self.omitted_list:
+            f.write("%d\n"%(om_item)) # GT id omitted
         # write merges
         f = open(write_path + "/merged-skeletons.ids", "w")
         f.write("%d\n"%(len(self.merge_list))) # no of pairs of merged skeletons
