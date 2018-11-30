@@ -115,7 +115,7 @@ class SkeletonEvaluation:
             max_pred = np.max(pred)
             assert len(pred_ids) == max_pred+1
         except:
-            print "Error! Labels in predicted segmentation are not consecutive"
+            print "Warning! Labels in predicted segmentation are not consecutive. Proceeding anyway"
         self.n_preds = len(pred_ids)
         try:
             assert gt_skeletons[0].grid_size == pred.shape

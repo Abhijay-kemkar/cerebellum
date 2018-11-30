@@ -8,7 +8,7 @@ from voxel_methods import calc_vi
 
 class SkelEval(object):
     """High level methods for error analysis of a segmentation against GT skeletons"""
-    def __init__(self, gt_name, pred_name, dsmpl_res=(80,80,80), t_om=0.8, t_m=0.2, t_s=0.7, overwrite_prev=False):
+    def __init__(self, gt_name, pred_name, dsmpl_res=(80,80,80), t_om=0.8, t_m=0.2, t_s=0.7, filtered=False, overwrite_prev=False):
         """
         Args (that are not attributes):
             dsmpl_res (int, int, int): resolution of downsampled GT segmentation before skeletonization
@@ -27,8 +27,10 @@ class SkelEval(object):
         self.gt_name = gt_name
         self.pred_name = pred_name
         self.gt_skeletons = ReadSkeletons(gt_name, read_edges=True, downsample_resolution=dsmpl_res)
-        self.pred = read3d_h5('./segs/' + pred_name + '/seg.h5', 'main')
+        if not filtered: self.pred = read3d_h5('./segs/' + pred_name + '/seg.h5', 'main')
+        if filtered: self.pred = read3d_h5('./segs/' + pred_name + '/filtered-seg.h5', 'main')
         self.results_folder = './err-analysis/' + pred_name
+        create_folder(self.results_folder)
         self.sk_eval = None
 
         if not os.path.exists(self.results_folder+'/skeleton-analysis-summary.json') or overwrite_prev:
