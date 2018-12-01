@@ -121,28 +121,36 @@ def iou_rank(seg_gt, seg_p, skip_ids=[], Ngt=None, Vmin=0, do_save=False, write_
         np.save(write_file, results)
     return results
 
-def slice_iou(last_slice, first_slice):
+def slice_iou(source_slice, target_slice):
     """
     Generates IoU scores of all objects across two slices
+
+    TODO: 
+    1. support unordered labels. see iou_calc function below for inspiration
+    2. make more efficient by adding use_bboxes option
     
     Args:
-        last_slice (ndarray 1 x X x Y): objects in this slice are compared
-        first_slice (ndarray 1 x X x Y): against objects in this slice
+        source_slice (ndarray 1 x X x Y): objects in this slice are compared
+        target_slice (ndarray 1 x X x Y): against objects in this slice
     """
     start_time = time.time()
-    n_objs = np.max(last_slice)
-    ints = np.zeros(n_objs)
-    unions = np.zeros(n_objs)
-    orders = np.zeros(n_objs)
-    ious = np.zeros(n_objs)
-    for i in range(n_objs):
-        if len(np.flatnonzero(last_slice==i))==0: # no voxels of this object in the slice
-            continue
-        front_ids, front_vols = intersection_list(last_slice, first_slice, i)
-        ints[i] = front_vols[0]
-        unions[i], orders[i] = union_count(last_slice, first_slice, i, front_ids[0], return_order=True)
-        ious[i] = float(ints[i])/unions[i]
-    return ints, unions, ious, orders, time.time()-start_time
+    good_labels = np.max(source_slice)==len(get_vols(source_slice)[0])
+    if not good_labels:
+    	raise RuntimeError('Labels in source slice are not ordered. Relabel and try again')
+    else:
+        n_objs = np.max(source_slice)
+        ints = np.zeros(n_objs)
+        unions = np.zeros(n_objs)
+        orders = np.zeros(n_objs)
+        ious = np.zeros(n_objs)
+        for i in range(n_objs):
+            if len(np.flatnonzero(source_slice==i))==0: # no voxels of this object in the slice
+                continue
+            front_ids, front_vols = intersection_list(source_slice, target_slice, i)
+            ints[i] = front_vols[0]
+            unions[i], orders[i] = union_count(source_slice, target_slice, i, front_ids[0], return_order=True)
+            ious[i] = float(ints[i])/unions[i]
+    	return ints, unions, ious, orders, time.time()-start_time
 
 def calc_vi(seg_gt, seg_p, fix_ids=None, do_save=False, write_file=""):
     """
