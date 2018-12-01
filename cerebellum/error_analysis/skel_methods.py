@@ -37,7 +37,10 @@ class NodeAssignment:
 
 class SkeletonEvaluation:
     # TODO: add ERL method for split errors based on CRCs of skeleton
-    def __init__(self, title, gt_skeletons, pred, t_om=0.8, t_m=0.5, t_s=0.7, calc_erl=False):
+    def __init__(self, title, gt_skeletons, pred, 
+                 t_om=0.8, t_m=0.5, t_s=0.7, 
+                 include_zero_split=False,
+                 calc_erl=False):
         """
         Evaluation of a predicted segmentation w.r.t. GT skeletons
         
@@ -93,18 +96,19 @@ class SkeletonEvaluation:
             else:
                 return merged_ids
             
-        def split_check(skeleton, id_map, t_s=t_s):
+        def split_check(skeleton, id_map, include_zero_split=include_zero_split, t_s=t_s):
             """
             Used to check if a GT skeleton is a split in the predicted segmentation
+
+                include_zero_split (bool): if True, consider pred segment 0 in split evaluation
             """
             assert skeleton.label == id_map.id_in
             pred_ids = id_map.ids_out
             pred_counts = id_map.counts_out
-            # ignore splits that involve purely 0
-            # TO DO: adding GT dilation option can allow us to relax this constraint
-            if 0 in pred_ids:
+            if 0 in pred_ids and not include_zero_split:
+                del pred_counts[pred_ids.index(0)]
                 pred_ids.remove(0)
-            if len(pred_ids) == 1 or (1.*pred_counts[0])/id_map.size_in > t_s:
+            if (1.*pred_counts[0])/id_map.size_in > t_s:
                 return [pred_ids[0]]
             else:
                 return pred_ids
@@ -131,8 +135,10 @@ class SkeletonEvaluation:
         self.t_s = t_s
         # main results
         self.categories = [None]*self.n_skels
-        self.erl_pred = None
-        self.erl_gt = None
+        self.erl_pred = 0
+        self.erl_gt = 0
+        self.trl_pred = 0
+        self.trl_gt = 0
         self.omitted_list = []
         self.merge_list = []
         self.split_list = []
@@ -180,19 +186,23 @@ class SkeletonEvaluation:
             # Omitted skeletons are not included in calculation
             # ERL of a skeleton is 0 if merged or hybrid
             # TODO: add method for splits
+            # ERL is a weighted mean of run lengths: see Google's FFN paper
+            # TRL is sum of run lengths
             tot_length = 0
             pred_length = 0
             gt_length = 0
             for i, sk in enumerate(gt_skeletons):
-                if self.categories[i] is "omitted":
-                    continue
+                # if self.categories[i] is "omitted": # don't penalize omissions
+                #     continue
                 this_length = sk.length()
                 tot_length += this_length
                 gt_length += this_length*this_length
                 if self.categories[i] is "correct":
                     pred_length += this_length*this_length
+                    self.trl_pred += this_length
             self.erl_pred = pred_length/tot_length
             self.erl_gt = gt_length/tot_length
+            self.trl_gt = tot_length
         
         print 'Skeleton evaluation time: {}'.format(time.time() - start_time)
 
@@ -205,6 +215,7 @@ class SkeletonEvaluation:
         assert n_om+n_m+n_s+n_c+n_h == self.n_skels
         print 'Results:\n%d omissions, %d merges, %d splits, %d hybrid, %d correct'%(n_om, n_m, n_s, n_h, n_c)
         print 'GT ERL: %d, Prediction ERL: %d'%(self.erl_gt, self.erl_pred)
+        print 'GT TRL: %d, Prediction TRL: %d'%(self.trl_gt, self.trl_pred)
         if write_path is not None:
             cat_counts = {
                 "thresholds":{
@@ -220,7 +231,9 @@ class SkeletonEvaluation:
                     "hybrid": n_h,
                     "correct": n_c,
                     "erl-pred": self.erl_pred,
-                    "erl-gt": self.erl_gt
+                    "erl-gt": self.erl_gt,
+                    "trl-pred": self.trl_pred,
+                    "trl-gt": self.trl_gt
                 }
             }
             with open(write_path + '/skeleton-analysis-summary.json', 'w') as outfile:

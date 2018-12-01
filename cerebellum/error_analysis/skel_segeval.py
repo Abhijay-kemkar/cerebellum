@@ -8,7 +8,10 @@ from voxel_methods import calc_vi
 
 class SkelEval(object):
     """High level methods for error analysis of a segmentation against GT skeletons"""
-    def __init__(self, gt_name, pred_name, dsmpl_res=(80,80,80), t_om=0.8, t_m=0.2, t_s=0.7, filtered=False, overwrite_prev=False):
+    def __init__(self, gt_name, pred_name, dsmpl_res=(80,80,80), 
+                 t_om=0.8, t_m=0.2, t_s=0.7, 
+                 include_zero_split=False, filtered=False, 
+                 overwrite_prev=False):
         """
         Args (that are not attributes):
             dsmpl_res (int, int, int): resolution of downsampled GT segmentation before skeletonization
@@ -39,7 +42,9 @@ class SkelEval(object):
         if not os.path.exists(self.results_folder+'/skeleton-analysis-summary.json') or overwrite_prev:
             print "Starting error analysis of " + pred_name + " against skeletons of " + gt_name
             self.sk_eval = SkeletonEvaluation(self.pred_name, self.gt_skeletons, self.pred, 
-                                                t_om=t_om, t_m=t_m, t_s=t_s, calc_erl=True)
+                                                t_om=t_om, t_m=t_m, t_s=t_s, 
+                                                include_zero_split=include_zero_split,
+                                                calc_erl=True)
             self.sk_eval.summary(write_path=self.results_folder)
             self.sk_eval.write_errors(write_path=self.results_folder)
             log = open("./logs/" + self.pred_name +'.log', "a+")
