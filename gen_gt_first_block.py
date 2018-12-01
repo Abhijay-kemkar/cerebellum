@@ -6,6 +6,7 @@ import json
 import math
 
 from cerebellum.data_prep.seg_prep import *
+from cerebellum.skeletonize import gen_skeletons
 
 ###
 # SET PARAMS
@@ -32,7 +33,9 @@ for i in range(n_blocks):
 	print block_lims
 	gt_block.read(gt8nm_file, "main", dsmpl=dsmpl, block_lims=block_lims)
 	print gt_block.shape
-	gt_block.gen_bboxes()
-	#gt_block.read_bboxes()
+	#gt_block.gen_bboxes()
+	gt_block.read_bboxes()
 	gt_block.relabel(use_bboxes=True, print_labels=False)
 	gt_block.write()
+	# skeletonize the block
+	gen_skeletons(gt_block_name, overwrite_prev=True)
