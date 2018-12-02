@@ -134,7 +134,7 @@ def slice_iou(source_slice, target_slice):
         target_slice (ndarray 1 x X x Y): against objects in this slice
     """
     start_time = time.time()
-    good_labels = np.max(source_slice)==len(get_vols(source_slice)[0])
+    good_labels = np.max(source_slice)==len(get_vols(source_slice)[0])-1
     if not good_labels:
     	raise RuntimeError('Labels in source slice are not ordered. Relabel and try again')
     else:

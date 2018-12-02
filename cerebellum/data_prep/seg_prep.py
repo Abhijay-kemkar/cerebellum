@@ -61,6 +61,23 @@ class SegPrep(object):
         # log.write("[%d:%d, %d:%d, %d:%d]\n"%(block_lims[0][0], block_lims[0][1], block_lims[1][0], block_lims[1][1], block_lims[2][0], block_lims[2][1]))
         # log.close()
 
+    def read_internal(self, stage=None):
+        """reads previously saved segmentation"""
+        if stage is None:
+            self.data = read3d_h5('./segs/' + self.name + '/seg.h5', 'main')
+        else:
+            self.data = read3d_h5('./segs/' + self.name + "/" + stage + "-seg.h5", 'main')
+        self.shape = list(self.data.shape)
+        self.seg_ids = np.unique(self.data)
+        self.n_ids = len(self.seg_ids)
+
+    def set_data(self, seg):
+        """assign segmentation data"""
+        self.data = seg
+        self.shape = list(seg.shape)
+        self.seg_ids = np.unique(self.data)
+        self.n_ids = len(self.seg_ids)
+
     def padzeros(self, nzeros, axis):
         """
         Pads zeros at end along chosen axis
@@ -89,11 +106,11 @@ class SegPrep(object):
         log = open("./logs/" + self.name +'.log', "a+")
         log.write("swapped axes %d and %d\n"%(axis1, axis2))
 
-    def write(self, filtered=False):
-        if filtered: 
-            fout = './segs/' + self.name + "/filtered-seg.h5"
-        else: 
+    def write(self, stage=None):
+        if stage is None: 
             fout = './segs/' + self.name + "/seg.h5"
+        else: 
+            fout = './segs/' + self.name + "/" + stage + "-seg.h5"
         writeh5(fout, 'main', self.data, compression="gzip", chunks=(1,self.data.shape[1],self.data.shape[2]))
         meta = open("./meta/" + self.name +'.meta', "a+")
         meta.write("# grid size\n")
@@ -128,20 +145,24 @@ class SegPrep(object):
         log = open("./logs/" + self.name +'.log', "a+")
         log.write(stop_msg)
 
-    def read_bboxes(self, external_path=None):
+    def read_bboxes(self, stage=None, external_path=None):
         """
         reads in previously evaluated bounding box information 
         """
         try:
-            if external_path is None: # read from segs folder of the same segmentation
+            if external_path is None and stage is None: # read from segs folder of the same segmentation
                 self.bbox_dict = read_json('./segs/'+self.name+'/bboxes.json')
+            elif external_path is None:
+                self.bbox_dict = read_json('./segs/'+self.name+'/bboxes-'+stage+'.json')
             else: # read externally, eg. bboxes computed form lower res segmentation
                 self.bbox_dict = read_json(external_path)
-            for i, bbox in self.bbox_dict.items(): # convert str keys to int keys
-                    self.bbox_dict[int(i)] = self.bbox_dict.pop(i)
-            assert self.n_ids == len(self.bbox_dict.keys())
         except:
             print "Could not locate bounding box file"
+        for i, bbox in self.bbox_dict.items(): # convert str keys to int keys
+                self.bbox_dict[long(i)] = self.bbox_dict.pop(i)
+        #for label in self.seg_ids.tolist(): # confirm you loaded the right bbox file for the segmentation data
+        #    print label
+        #    assert label in self.bbox_dict.keys()
 
     def find_fiber_ids(self, method="bbox-aspect-ratio", params=None):
         """
@@ -196,6 +217,8 @@ class SegPrep(object):
         # update class ID info
         self.seg_ids = np.append(self.fiber_ids, 0)
         self.n_ids = len(self.fiber_ids)+1
+        # save bbox dict
+        write_json(self.bbox_dict, './segs/'+self.name+'/bboxes-filtered.json')
         print "Fiber filtering time: %f"%(time.time()-start_time)
 
     def relabel(self, id_map=None, use_bboxes=False, print_labels=False):
