@@ -28,7 +28,7 @@ def intersection_list(seg_gt, seg_p, gt_id):
     pred_vols = pred_vols[pred_ids_sorted]
     return (pred_ids, pred_vols)
 
-def pred_fails(seg_gt, seg_p, do_save=False, write_file=""):
+def pred_fails(seg_gt, seg_p, thresh_miss=0, do_save=False, write_file=""):
     """
     Find all GT objects completely missing in prediction
 
@@ -43,7 +43,7 @@ def pred_fails(seg_gt, seg_p, do_save=False, write_file=""):
     fails = []
     for i in range(1,len(gt_ids)): # skip segment 0
         pred_ids, pred_vols = intersection_list(seg_gt, seg_p, gt_ids[i])
-        if pred_ids[0]==0:
+        if pred_ids[0]==0 and float(pred_vols[0])/np.sum(pred_vols) > thresh_miss:
             fails.append(gt_ids[i])
     if do_save:
         np.save(write_file, fails)
@@ -193,7 +193,7 @@ def vi_rank(seg_gt, seg_p, iou_results, iou_max=0.7, do_save=False, write_file="
         do_save (bool): flag to save results
         write_file (str): path for result file
     Returns:
-        id_calc (nx, ndarray), deltaVI (nx2 ndarray): 
+        id_calc (nx, ndarray), deltaVI (nx2 ndarray): (VI split, VI merge)
     """
     gt_ids, iou_scores = iou_results[0,:], iou_results[1,:]
     vi_split, vi_merge = CremiEvaluate(seg_p.astype(np.int), seg_gt.astype(np.int))

@@ -9,8 +9,9 @@ from voxel_methods import calc_vi
 class SkelEval(object):
     """High level methods for error analysis of a segmentation against GT skeletons"""
     def __init__(self, gt_name, pred_name, dsmpl_res=(80,80,80), 
-                 t_om=0.8, t_m=0.2, t_s=0.7, 
-                 include_zero_split=False, filtered=False, 
+                 t_om=0.9, t_m=0.5, t_s=0.8, 
+                 include_zero_split=False, include_zero_merge=False,
+                 stage=None, 
                  overwrite_prev=False):
         """
         Args (that are not attributes):
@@ -30,12 +31,14 @@ class SkelEval(object):
         self.gt_name = gt_name
         self.pred_name = pred_name
         self.gt_skeletons = ReadSkeletons(gt_name, read_edges=True, downsample_resolution=dsmpl_res)
-        if not filtered: 
+        self.stage = stage
+        if stage is None: 
             self.pred = read3d_h5('./segs/' + pred_name + '/seg.h5', 'main')
             self.results_folder = './err-analysis/' + pred_name
         else:
-            self.pred = read3d_h5('./segs/' + pred_name + '/filtered-seg.h5', 'main')
-            self.results_folder = './err-analysis/' + pred_name + '/filtered/'
+            self.pred = read3d_h5('./segs/' + pred_name + '/' + stage + '-seg.h5', 'main')
+            self.results_folder = './err-analysis/' + pred_name + '/' + stage
+            create_folder('./err-analysis/' + pred_name)
         create_folder(self.results_folder)
         self.sk_eval = None
 
@@ -44,6 +47,7 @@ class SkelEval(object):
             self.sk_eval = SkeletonEvaluation(self.pred_name, self.gt_skeletons, self.pred, 
                                                 t_om=t_om, t_m=t_m, t_s=t_s, 
                                                 include_zero_split=include_zero_split,
+                                                include_zero_merge=include_zero_merge,
                                                 calc_erl=True)
             self.sk_eval.summary(write_path=self.results_folder)
             self.sk_eval.write_errors(write_path=self.results_folder)
@@ -97,12 +101,60 @@ class SkelEval(object):
             corr_ids[i] = int(cstr.split(',')[1])
         return corr_ids
 
+    def get_splits(self, look_in="pred"):
+        split_file = self.results_folder + "/split-skeletons.ids"
+        if not os.path.exists(split_file):
+            print "Error retrieving IDs because skeleton evaluation has not been run yet"
+            return
+        else:
+            f = open(split_file, "r")
+            n_splits = int(f.readline()) # no of GT split skeletons
+            if look_in == "gt":
+                split_strs = f.readlines()[::2]
+                split_ids = len(split_strs)*[0]
+                for i, spstr in enumerate(split_strs):
+                    split_ids[i] = int(spstr)
+            elif look_in == "pred":
+                split_strs = f.readlines()[1::2]
+                split_ids = []
+                for spstr in split_strs:
+                    seg_strs = spstr.split(', ')
+                    seg_strs.remove('\n')
+                    for seg_id in seg_strs:
+                        split_ids.append(int(seg_id))
+            else:
+                print "Error: look_in must equal either 'gt' or 'pred'"
+                return
+            split_ids = list(set(split_ids))
+            return split_ids
+
+    def get_omissions(self):
+        pass
+
     def merge_oracle(self):
         """Computes VI after fixing merges from skeleton error analysis"""
-        vox_eval = VoxEval(self.gt_name, self.pred_name)
+        if self.stage is None:
+            vox_eval = VoxEval(self.gt_name, self.pred_name)
+        else:
+            vox_eval = VoxEval(self.gt_name, self.pred_name, stage=self.stage)
         vi = vox_eval.get_vi()
         print "Original VI split, VI merge: %f, %f"%(vi[0], vi[1])
         fix_ids = self.get_merges(look_in="gt")
         vox_eval.remove_from_gt(vox_eval.missing_objs)
         print "After fixing %d merges in GT flagged by skeleton analysis:"%(len(fix_ids))
-        print calc_vi(vox_eval.gt, vox_eval.pred, fix_ids=fix_ids, do_save=True, write_file=self.results_folder+'/vi-merge-oracle.json')
+        print calc_vi(vox_eval.gt, vox_eval.pred, fix_ids=fix_ids, do_save=True, 
+                      write_file=self.results_folder+'/vi-merge-oracle.json')
+
+    def split_oracle(self):
+        """Computes VI after fixing splits from skeleton error analysis"""
+        if self.stage is None:
+            vox_eval = VoxEval(self.gt_name, self.pred_name)
+        else:
+            vox_eval = VoxEval(self.gt_name, self.pred_name, stage=self.stage)
+        vi = vox_eval.get_vi()
+        print "Original VI split, VI merge: %f, %f"%(vi[0], vi[1])
+        fix_ids = self.get_splits(look_in="gt")
+        vox_eval.remove_from_gt(vox_eval.missing_objs)
+        print "After fixing %d splits in GT flagged by skeleton analysis:"%(len(fix_ids))
+        print calc_vi(vox_eval.gt, vox_eval.pred, fix_ids=fix_ids, do_save=True, 
+                      write_file=self.results_folder+'/vi-split-oracle.json')

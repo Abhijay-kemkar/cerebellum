@@ -6,7 +6,7 @@ from cerebellum.utils.data_io import *
 
 class VoxEval(object):
     """High level methods for voxel based evaluation of segmentations"""
-    def __init__(self, gt_name, pred_name):
+    def __init__(self, gt_name, pred_name, stage=None):
         """
         Attributes:
             gt_name (str): name of GT segmentation
@@ -22,15 +22,22 @@ class VoxEval(object):
         self.gt_name = gt_name
         self.pred_name = pred_name
         self.gt = read3d_h5('./segs/' + gt_name + '/seg.h5', 'main')
-        self.pred = read3d_h5('./segs/' + pred_name + '/seg.h5', 'main')
+        self.stage = stage
+        if stage is None:
+            self.pred = read3d_h5('./segs/' + pred_name + '/seg.h5', 'main')
+            self.results_folder = './err-analysis/' + pred_name
+        else:
+            self.pred = read3d_h5('./segs/' + pred_name + '/' + stage + '-seg.h5', 'main')
+            self.results_folder = './err-analysis/' + pred_name + '/' + stage
         self.pred[self.gt==0] = 0 # zero voxels that are unlabeled in GT
-        self.results_folder = './err-analysis/' + pred_name
         self.missing_objs = read_npy(self.results_folder+'/missing-objs.npy')
         self.vi = read_json(self.results_folder+'/vi.json')
         self.iou_results = read_npy(self.results_folder+'/iou_results.npy')
         self.delta_vis = read_npy(self.results_folder+'/vi_scores.npy')
         print "Starting voxel evaluation methods for " + pred_name + " against " + gt_name
         if self.missing_objs is None:
+            if stage is not None:
+                create_folder('./err-analysis/' + pred_name)
             create_folder(self.results_folder)
             log = open("./logs/" + self.pred_name +'.log', "a+")
             log.write("initialized voxel based evaluation against " + gt_name + "\n\n")
@@ -41,9 +48,10 @@ class VoxEval(object):
         for i in ids:
             self.gt[self.gt==i] = 0
 
-    def find_misses(self):
+    def find_misses(self, thresh_miss=0):
         """finds GT objects missing in pred, removes them for further evaluation methods"""
-        self.missing_objs = pred_fails(self.gt, self.pred, do_save=True, 
+        self.missing_objs = pred_fails(self.gt, self.pred, thresh_miss=thresh_miss,
+                                        do_save=True, 
                                         write_file=self.results_folder+'/missing-objs')
         print "Found %d GT objects completely missing"%(self.missing_objs.size)
         self.remove_from_gt(self.missing_objs.tolist())
@@ -88,7 +96,7 @@ class VoxEval(object):
         log.write("%d\n"%(print_count))
         log.close()
 
-    def find_delta_vis(self, iou_max=0.7, hist_segs=15):
+    def find_delta_vis(self, iou_max=0.7):
         """
         runs deltaVI calculation
         Args:
@@ -99,8 +107,18 @@ class VoxEval(object):
         self.delta_vis = vi_rank(self.gt, self.pred, self.iou_results, 
                                  iou_max=iou_max, do_save=True, 
                                  write_file=self.results_folder+"/vi_scores")
+        log = open("./logs/" + self.pred_name +'.log', "a+")
+        log.write("delta_VI calculation complete for objects with IoU score below %f\n\n"%(iou_max))
+        log.close()
+
+    def gen_vi_histograms(self, hist_segs=10):
+        """
+        Plots histograms of contributions of inidivudal GT Objects to deltaVI
+        """
         gt_vi = self.delta_vis[0,:]
         deltaVI = self.delta_vis[1:,:]
+        # generate delatVI histograms
+        # segments ranked by delta_VI total
         n_segs = min(hist_segs, deltaVI.shape[1])
         ind = np.arange(n_segs)
         width = 0.5
@@ -115,11 +133,39 @@ class VoxEval(object):
         fig.set_size_inches(16, 6)
         plt.savefig(self.results_folder+'/deltaVI.png', bbox_inches="tight")
         plt.close()
-        log = open("./logs/" + self.pred_name +'.log', "a+")
-        log.write("delta_VI calculation complete for objects with IoU score below %f\n\n"%(iou_max))
-        log.close()
+        # segments ranked by delta_VI split
+        sort_splits = np.argsort(-deltaVI[0,:])
+        gt_vi = gt_vi[sort_splits]
+        deltaVI = deltaVI[:,sort_splits]
+        fig, ax = plt.subplots(1)
+        psplit = ax.bar(ind, deltaVI[0,:n_segs], width, color='#d62728')
+        pmerge = ax.bar(ind, deltaVI[1,:n_segs], width, bottom=deltaVI[0,:n_segs])
+        plt.ylabel('delta_VI')
+        plt.xlabel('GT id of segment')
+        plt.title('Objects with highest delta_VI split')
+        plt.xticks(ind, gt_vi[:n_segs].astype(int))
+        plt.legend((psplit[0], pmerge[0]), ('delta_VI split', 'delta_VI merge'))
+        fig.set_size_inches(16, 6)
+        plt.savefig(self.results_folder+'/deltaVI_split.png', bbox_inches="tight")
+        plt.close()
+        # segments ranked by delta_VI merge
+        sort_merges = np.argsort(-deltaVI[1,:])
+        gt_vi = gt_vi[sort_merges]
+        deltaVI = deltaVI[:,sort_merges]
+        fig, ax = plt.subplots(1)
+        psplit = ax.bar(ind, deltaVI[0,:n_segs], width, color='#d62728')
+        pmerge = ax.bar(ind, deltaVI[1,:n_segs], width, bottom=deltaVI[0,:n_segs])
+        plt.ylabel('delta_VI')
+        plt.xlabel('GT id of segment')
+        plt.title('Objects with highest delta_VI merge')
+        plt.xticks(ind, gt_vi[:n_segs].astype(int))
+        plt.legend((psplit[0], pmerge[0]), ('delta_VI split', 'delta_VI merge'))
+        fig.set_size_inches(16, 6)
+        plt.savefig(self.results_folder+'/deltaVI_merge.png', bbox_inches="tight")
+        plt.close()
+        print "Delta VI histogram plots generated and saved"
 
-    def run_fullsuite(self, iou_max=0.7, overwrite_prev=False):
+    def run_fullsuite(self, thresh_miss=0, iou_max=0.7, hist_segs=10, overwrite_prev=False):
         """
         Runs all voxel evaluation methods. If previously run, loads existing results
 
@@ -129,7 +175,7 @@ class VoxEval(object):
         """
         if self.missing_objs is None or overwrite_prev:
             print "Starting missing object evaluation"
-            self.find_misses()
+            self.find_misses(thresh_miss=thresh_miss)
         else:
             print "Missing object results loaded"
         if self.vi is None or overwrite_prev:
@@ -147,6 +193,7 @@ class VoxEval(object):
             self.find_delta_vis(iou_max=iou_max)
         else:
             print "delta_VI results loaded"
+        self.gen_vi_histograms(hist_segs=hist_segs)
 
     def get_vi(self):
         """returns VI as tuple of two floats: (VI split, VI merge)"""

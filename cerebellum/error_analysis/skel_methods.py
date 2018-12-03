@@ -38,8 +38,9 @@ class NodeAssignment:
 class SkeletonEvaluation:
     # TODO: add ERL method for split errors based on CRCs of skeleton
     def __init__(self, title, gt_skeletons, pred, 
-                 t_om=0.8, t_m=0.5, t_s=0.7, 
+                 t_om=0.9, t_m=0.5, t_s=0.8, 
                  include_zero_split=False,
+                 include_zero_merge=False,
                  calc_erl=False):
         """
         Evaluation of a predicted segmentation w.r.t. GT skeletons
@@ -74,7 +75,7 @@ class SkeletonEvaluation:
             corr_list (list of ID maps): each ID map from GT id -> pred id
             gt2pred (list of ID maps): of all objects from GT id -> pred ids
         """
-        def merge_check(id_map1, id_map2, t_m=t_m):
+        def merge_check(id_map1, id_map2, t_m=t_m, include_zero_merge=include_zero_merge):
             """
             Used to check if two GT skeletons have a merge in the predicted segmentation
             
@@ -89,7 +90,7 @@ class SkeletonEvaluation:
                         if (1.*id_map2.counts_out[i])/id_map2.size_in > t_m]
             merged_ids = list(set(top_ids1) & set(top_ids2))
             # ignore if both objects are mostly in 0, this could be an unlabeled object in GT
-            if 0 in merged_ids:
+            if 0 in merged_ids and not include_zero_merge:
                 merged_ids.remove(0)
             if len(merged_ids)==0:
                 return []
@@ -133,12 +134,16 @@ class SkeletonEvaluation:
         self.t_om = t_om
         self.t_m = t_m
         self.t_s = t_s
+        print 'Using error thresholds: t_om=%.2f, t_m=%.2f, t_s=%.2f'%(t_om, t_m, t_s)
         # main results
         self.categories = [None]*self.n_skels
         self.erl_pred = 0
         self.erl_gt = 0
         self.trl_pred = 0
         self.trl_gt = 0
+        self.split_length = 0
+        self.merged_length = 0
+        self.omitted_length = 0
         self.omitted_list = []
         self.merge_list = []
         self.split_list = []
@@ -185,7 +190,7 @@ class SkeletonEvaluation:
             # compute ERL as weighted mean of individual skeleton ERLs
             # Omitted skeletons are not included in calculation
             # ERL of a skeleton is 0 if merged or hybrid
-            # TODO: add method for splits
+            # TODO: add more accurate CRC based method for splits
             # ERL is a weighted mean of run lengths: see Google's FFN paper
             # TRL is sum of run lengths
             tot_length = 0
@@ -197,9 +202,20 @@ class SkeletonEvaluation:
                 this_length = sk.length()
                 tot_length += this_length
                 gt_length += this_length*this_length
-                if self.categories[i] is "correct":
+                category = self.categories[i]
+                if category is "correct":
                     pred_length += this_length*this_length
                     self.trl_pred += this_length
+                elif category is "omitted":
+                    self.omitted_length += this_length
+                elif category is "merged" or category is "hybrid":
+                    self.merged_length += this_length
+                elif category is "split":
+                    split_map = self.gt2pred[i]
+                    split_frac = float(split_map.counts_out[0])/split_map.size_in
+                    pred_length += (split_frac*split_frac)*(this_length*this_length)
+                    self.split_length += (1-split_frac)*this_length
+                    self.trl_pred += split_frac*this_length
             self.erl_pred = pred_length/tot_length
             self.erl_gt = gt_length/tot_length
             self.trl_gt = tot_length
@@ -216,6 +232,7 @@ class SkeletonEvaluation:
         print 'Results:\n%d omissions, %d merges, %d splits, %d hybrid, %d correct'%(n_om, n_m, n_s, n_h, n_c)
         print 'GT ERL: %d, Prediction ERL: %d'%(self.erl_gt, self.erl_pred)
         print 'GT TRL: %d, Prediction TRL: %d'%(self.trl_gt, self.trl_pred)
+        print 'Omitted RL: %d, Merged RL: %d, Split RL: %d'%(self.omitted_length, self.merged_length, self.split_length)
         if write_path is not None:
             cat_counts = {
                 "thresholds":{
@@ -233,7 +250,10 @@ class SkeletonEvaluation:
                     "erl-pred": self.erl_pred,
                     "erl-gt": self.erl_gt,
                     "trl-pred": self.trl_pred,
-                    "trl-gt": self.trl_gt
+                    "trl-gt": self.trl_gt,
+                    "omitted-rl": self.omitted_length,
+                    "merged-rl": self.merged_length,
+                    "split-rl": self.split_length
                 }
             }
             with open(write_path + '/skeleton-analysis-summary.json', 'w') as outfile:
@@ -257,8 +277,9 @@ class SkeletonEvaluation:
         f.write("%d\n"%(len(self.split_list))) # no of split skeletons
         for split_item in self.split_list:
             f.write("%d\n"%(split_item.id_in)) # ID of split skeleton
-            for obj in split_item.ids_out:
+            for obj in (split_item.ids_out):
                 f.write("%d, "%(obj))
+            f.write("\n")
         # write correct ids
         f = open(write_path + "/correct-skeletons.ids", "w")
         f.write("%d\n"%(len(self.corr_list))) # no of split skeletons
