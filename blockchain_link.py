@@ -12,8 +12,10 @@ resolution = (30, 48, 48)
 block_size = 60
 affinity_offset = 14
 wz_thresh = 0.5
-n_blocks = 15
+n_blocks = 16
 sblock_ids = range(0,n_blocks-1)
+iou_thresh = 0.5 # IMPORTANT
+chain_name = "locked-to-0"#"locked-to-0-iou-%.2f"%(iou_thresh)
 ###
 
 # link blocks in linear fashion
@@ -25,7 +27,7 @@ for sblock_id in sblock_ids:
     sblock_name = "waterz%.2f-48nm-crop2gt-%04d"%(wz_thresh, zz_sb)
     sblock = SegPrep(sblock_name, resolution)
     if sblock_id==0: sblock.read_internal(stage="filtered")
-    else: sblock.read_internal(stage="locked-to-0")
+    else: sblock.read_internal(stage=chain_name)
     sblock.read_bboxes() # Warning! If objects are relabeled, load relabeled-bboxes.json
     sblock_seg = sblock.data
     sbbox_dict = sblock.bbox_dict
@@ -38,8 +40,8 @@ for sblock_id in sblock_ids:
     tblock_seg = tblock.data
     tbbox_dict = tblock.bbox_dict
     print "Linking block %d and %d"%(sblock_id, tblock_id)
-    tblock_locked = block_lock(sblock_seg, tblock_seg, iou_thresh=0.5, 
+    tblock_locked = block_lock(sblock_seg, tblock_seg, iou_thresh=iou_thresh, 
                                tbbox_dict=tbbox_dict)
     tblock.data = tblock_locked
-    tblock.write(stage="locked-to-0")
+    tblock.write(stage=chain_name)
 print "Completed block-chain. Total runtime: %f"%(time.time()-start_time)

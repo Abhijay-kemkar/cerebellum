@@ -78,6 +78,9 @@ class SegPrep(object):
         self.seg_ids = np.unique(self.data)
         self.n_ids = len(self.seg_ids)
 
+    def set_bbox_dict(self, bbox_dict):
+        self.bbox_dict = bbox_dict
+
     def padzeros(self, nzeros, axis):
         """
         Pads zeros at end along chosen axis
@@ -233,6 +236,7 @@ class SegPrep(object):
 
         # case: no need to relabel
         if max_id == self.n_ids-1:
+            print "No need to relabel!"
             log.write("False\n")
             log.close()
         else:
