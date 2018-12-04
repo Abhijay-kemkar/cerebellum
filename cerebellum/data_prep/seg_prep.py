@@ -5,6 +5,7 @@ import json
 
 from cerebellum.utils.data_io import *
 from cerebellum.utils.mask import get_bbox
+from cerebellum.stats.voxel_stats import get_vols
 
 class SegPrep(object):
     """
@@ -173,29 +174,67 @@ class SegPrep(object):
         Args:
             method (str): filtering statistic, currently using Haidong's heuristics
             params (dict): dict of thresholding params, will vary based on method
-        TODO (Jeff): improve filtering criterion
+        TODO (Jeff): 
+            add improved aspect ratio calculation from slice wise measurements
+        TODO: 
+            Make extrude method more efficient by looking for overlapping bboxes instead
+            of doing a full volume search
         """
         self.fiber_ids = []
-        if method=="bbox-aspect-ratio":
+        start_time = time.time()
+        if method=="bbox-aspect-ratio" or method=="extrude":
+            # use bbox aspect ratio to select fibers
             if self.bbox_dict is None:
                 self.read_bboxes()
-            if params is None:
-                # default params
-                vol_thresh = 45*45*200
-                len_thresh = 30
-            else:
-                vol_thresh = params["vol-thresh"]
-                len_thresh = params["len-thresh"]
-            for obj_id in self.seg_ids.tolist():
-                bbox = self.bbox_dict[obj_id]
-                bbox_vol = (bbox[5]-bbox[2])*(bbox[4]-bbox[1])*(bbox[3]-bbox[0])
-                bbox_len = (bbox[3]-bbox[0])
-                if bbox_vol < vol_thresh and bbox_len > len_thresh:
-                    self.fiber_ids.append(obj_id)
-        fout = open('./segs/'+self.name+'/fiber.ids', "w")
+            # extract filter params
+            vol_thresh = params["vol-thresh"] # fiber volume threshold
+            len_thresh = params["len-thresh"] # fiber length threshold
+            if method=="extrude": 
+                area_thresh = params["split-area-thresh"] # area threshold for small fiber splits 
+            # begin fiber ID search
+            if method=="bbox-aspect-ratio" or bbox=="extrude":
+                for obj_id in self.seg_ids.tolist():
+                    bbox = self.bbox_dict[obj_id]
+                    bbox_vol = (bbox[5]-bbox[2])*(bbox[4]-bbox[1])*(bbox[3]-bbox[0])
+                    bbox_len = (bbox[3]-bbox[0])
+                    if bbox_vol < vol_thresh and bbox_len > len_thresh:
+                        self.fiber_ids.append(obj_id)
+                        if method=="extrude" and bbox_len < self.shape[0]:
+                            # "extrude" is an optional second level of filtration after "bbox-aspect-ratio"
+                            # the goal is to catch small fiber splits that were missed in the first stage
+                            y_slice = slice(bbox[1], bbox[4])
+                            x_slice = slice(bbox[2], bbox[5])
+                            # get box extruded along z-axis to search for small splits
+                            extrude_box = np.concatenate((self.data[0:bbox[0],y_slice,x_slice], 
+                                                          self.data[bbox[3]:self.shape[0],y_slice,x_slice]), axis=0)
+                            objs_caught = np.unique(extrude_box)
+                            # keep only those objects splits an area threshold
+                            for o_id in objs_caught:
+                                o_bbox = self.bbox_dict[o_id]
+                                o_area = (o_bbox[5]-o_bbox[2])*(o_bbox[4]-o_bbox[1])
+                                if o_area < area_thresh:
+                                    self.fiber_ids.append(o_id)
+                self.fiber_ids = list(set(self.fiber_ids))
+        if method=="dsmpl":
+            # "dsmpl" catches the large cell bodies in a downsampled segmentation 
+            # and zeros them out in the original segmentation
+            dsmpl = params["dsmpl"]
+            bvol_thresh = params["bvol-thresh"]
+            seg_dsmpl = self.data[::dsmpl[0], ::dsmpl[1], ::dsmpl[2]]
+            labels, vols = get_vols(seg_dsmpl)
+            body_ids = [label[0] for label in labels[np.argwhere(vols>bvol_thresh)]]
+            print "Found %d cell bodies"%(len(body_ids))
+            self.fiber_ids = [label for label in self.seg_ids if label not in body_ids]
+        else:
+            print "Error: Invalid fiber extraction method"
+        fout = open('./segs/'+self.name+'/fiber'+'-filt-'+method+'.ids', "w")
         for i in self.fiber_ids:
             fout.write('%d'%(i))
-        print "Found %d fibers out of %d objects"%(len(self.fiber_ids), self.n_ids)
+        if method=="bbox-aspect-ratio":
+            print "Found %d fibers out of %d objects"%(len(self.fiber_ids), self.n_ids)
+        elif method=="extrude":
+            print "Found %d fiber components out of %d objects"%(len(self.fiber_ids), self.n_ids)
+        print "Fiber extraction time: %f s"%(time.time()-start_time)          
 
     def filter_fibers(self):
         """
