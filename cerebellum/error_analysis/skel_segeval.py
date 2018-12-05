@@ -88,7 +88,7 @@ class SkelEval(object):
             merge_ids = list(set(merge_ids))
             return merge_ids
 
-    def get_corrects(self):
+    def get_corrects(self, look_in="pred"):
         """Returns list of pred object IDs identified as correct in skeleton-based error analysis"""
         corr_file = self.results_folder + "/correct-skeletons.ids"
         if not os.path.exists(corr_file):
@@ -97,9 +97,14 @@ class SkelEval(object):
         f = open(corr_file, "r")
         n_corr = int(f.readline()) # no of pairs of GT merged skeletons
         corr_ids = f.readlines()
-        for i, cstr in enumerate(corr_ids):
-            corr_ids[i] = int(cstr.split(',')[1])
-        return corr_ids
+        if look_in=="pred":
+            for i, cstr in enumerate(corr_ids):
+                corr_ids[i] = int(cstr.split(',')[1])
+            return corr_ids
+        elif look_in=="gt":
+            for i, cstr in enumerate(corr_ids):
+                corr_ids[i] = int(cstr.split(',')[0])
+            return corr_ids
 
     def get_splits(self, look_in="pred"):
         split_file = self.results_folder + "/split-skeletons.ids"
@@ -158,3 +163,31 @@ class SkelEval(object):
         print "After fixing %d splits in GT flagged by skeleton analysis:"%(len(fix_ids))
         print calc_vi(vox_eval.gt, vox_eval.pred, fix_ids=fix_ids, do_save=True, 
                       write_file=self.results_folder+'/vi-split-oracle.json')
+
+    def pr_analysis(self, detected_ids, type, write_path=None):
+        """
+        Returns precision and recall of IDs from an external error detection approach
+        """
+        if type=="merge":
+            analysis_ids = self.get_merges(look_in="pred")
+        elif type=="split":
+            analysis_ids = self.get_splits(look_in="pred")
+        corr_ids = self.get_splits(look_in="pred")
+        true_pos = list(set(analysis_ids)&(set(detected_ids)))
+        print "True positives: %d"%(len(true_pos))
+        false_pos = list(set(corr_ids)&(set(detected_ids)))
+        print "False positives: %d"%(len(false_pos))
+        true_neg = list(set(corr_ids).difference(set(detected_ids)))
+        print "True negatives: %d"%(len(true_neg))
+        false_neg = list(set(analysis_ids).difference(set(detected_ids)))
+        print "False negatives: %d"%(len(false_neg))
+        precision = len(true_pos)/(1.*len(true_pos)+len(false_pos))
+        recall = len(true_pos)/(1.*len(true_pos)+len(false_neg))
+        print "Precision: %f"%(precision)
+        print "Recall: %f"%(recall)
+        print "False pos:", false_pos
+        print "False neg:", false_neg
+        if write_path is not None:
+            np.save(write_path+'false_pos', false_pos)
+            np.save(write_path+'false_neg', false_neg)
+        return (precision, recall)
