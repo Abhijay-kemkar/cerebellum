@@ -32,14 +32,15 @@ class SegPrep(object):
         create_folder('./segs/')
         create_folder('./segs/' + self.name)
         create_folder('./meta/')
-        meta = open("./meta/" + name +'.meta', "w")
-        meta.write("# resolution in nm\n")
-        meta.write("%dx%dx%d\n"%(res[2], res[1], res[0]))
-        meta.close()
-        create_folder('./logs/')
-        log = open("./logs/" + name +'.log', "w")
-        log.write("created .meta file\n\n")
-        log.close()
+        if not os.path.exists('./meta/' + name + '.meta'):
+            meta = open("./meta/" + name +'.meta', "w")
+            meta.write("# resolution in nm\n")
+            meta.write("%dx%dx%d\n"%(res[2], res[1], res[0]))
+            meta.close()
+            create_folder('./logs/')
+            log = open("./logs/" + name +'.log', "w")
+            log.write("created .meta file\n\n")
+            log.close()
 
     def read(self, filename, datasetname, dsmpl=(1,1,1), block_lims=3*((None,None),)):
         """
