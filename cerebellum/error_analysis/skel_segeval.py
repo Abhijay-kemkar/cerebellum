@@ -89,7 +89,7 @@ class SkelEval(object):
             return merge_ids
 
     def get_corrects(self, look_in="pred"):
-        """Returns list of pred object IDs identified as correct in skeleton-based error analysis"""
+        """Returns list of object IDs identified as correct in skeleton-based error analysis"""
         corr_file = self.results_folder + "/correct-skeletons.ids"
         if not os.path.exists(corr_file):
             print "Error retrieving IDs because skeleton evaluation has not been run yet"
@@ -172,7 +172,8 @@ class SkelEval(object):
             analysis_ids = self.get_merges(look_in="pred")
         elif type=="split":
             analysis_ids = self.get_splits(look_in="pred")
-        corr_ids = self.get_splits(look_in="pred")
+        corr_ids = self.get_corrects(look_in="pred")
+        print "Benchmarking against %d error IDs and %d correct IDs"%(len(analysis_ids), len(corr_ids))
         true_pos = list(set(analysis_ids)&(set(detected_ids)))
         print "True positives: %d"%(len(true_pos))
         false_pos = list(set(corr_ids)&(set(detected_ids)))
