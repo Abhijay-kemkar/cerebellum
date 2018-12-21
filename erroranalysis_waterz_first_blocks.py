@@ -1,17 +1,15 @@
 from cerebellum.error_analysis.skel_segeval import *
 
-wz_threshes = [0.5]
+wz_threshes = [0.5] # waterz thresholds
 
 ###
 # SET PARAMS
 with open('data_locs.json') as f:
 	data_locs = json.load(f)
 resolution = (30, 48, 48)
-dsmpl = (1,6,6) # from 8 nm
-seg8nm_folder = "/home/srujanm/cerebellum/data/vol1/waterz/"
 bbox = data_locs["gt"]["8nm-bbox"] # global bbox
 aff_offset = data_locs["aff-offset"] # affinity offset along z-axis
-block_size = 60
+block_size = 60 # number of slices along z-axis
 # set skeleton error analysis thresholds
 t_om = 0.9
 t_m = 0.5
@@ -25,22 +23,44 @@ for wz_id, wz_thresh in enumerate(wz_threshes):
 	seg_block_name = "waterz%.2f-48nm-crop2gt-%04d"%(wz_thresh, zz)
 	# evaluate unfiltered pred against GT skeletons
 	# results are saved to ./err-analysis/<seg_block_name>/folder
-	vox_eval = VoxEval(gt_block_name, seg_block_name, stage=None)
-	vox_eval.run_fullsuite(iou_max=0.6, hist_segs=10, overwrite_prev=False)
-	skel_eval = SkelEval(gt_block_name, seg_block_name, dsmpl_res=(80,80,80), 
-	                     t_om=t_om, t_m=t_m, t_s=t_s, 
-	                     include_zero_split=False, include_zero_merge=True,
-	                     stage=None, overwrite_prev=True)
-	skel_eval.merge_oracle()
-	skel_eval.split_oracle()
+	#print "Evaluating unfiltered segmentation"
+	#vox_eval = VoxEval(gt_block_name, seg_block_name, stage=None)
+	# vox_eval.run_fullsuite(iou_max=0.6, hist_segs=10, overwrite_prev=False)
+	# vox_eval.find_misses(thresh_miss=t_om)
+	# vox_eval.find_vi()
+	# skel_eval = SkelEval(gt_block_name, seg_block_name, dsmpl_res=(80,80,80), 
+	#                      t_om=t_om, t_m=t_m, t_s=t_s, 
+	#                      include_zero_split=False, include_zero_merge=True,
+	#                      stage=None, overwrite_prev=True)
+	#skel_eval.merge_oracle()
+	#skel_eval.split_oracle()
 
-	# repeat error analysis for filtered objects
+	# # repeat error analysis for filtered objects
 	# results are saved to ./err-analysis/<seg_block_name>/folder
-	vox_eval = VoxEval(gt_block_name, seg_block_name, stage="filtered")
+	# filter_method = "dsmpl"
+	# print "Evaluating segmentation fitlered using %s method"%(filter_method)
+	# vox_eval = VoxEval(gt_block_name, seg_block_name, stage="filt-"+filter_method)
+	# #vox_eval.run_fullsuite(iou_max=0.6, hist_segs=10, thresh_miss=t_om, overwrite_prev=False)
+	# #ox_eval.find_misses(thresh_miss=t_om)
+	# vox_eval.find_vi()
+	# skel_eval = SkelEval(gt_block_name, seg_block_name, dsmpl_res=(80,80,80), 
+	#                     t_om=t_om, t_m=t_m, t_s=t_s, 
+	#                     include_zero_split=False, include_zero_merge=True,
+	#                     stage="filt-"+filter_method, overwrite_prev=True)
+	#skel_eval.merge_oracle()
+	#skel_eval.split_oracle()
+
+	# repeat error analysis for tracked objects
+	# results are saved to ./err-analysis/<seg_block_name>/folder
+	iou_thresh = 0.3 # for tracking
+	print  "Evaluating segmentation tracked using IoU threshold %f"%(iou_thresh)
+	vox_eval = VoxEval(gt_block_name, seg_block_name, stage="tracked-iou-%.2f"%iou_thresh)
 	vox_eval.run_fullsuite(iou_max=0.6, hist_segs=10, thresh_miss=t_om, overwrite_prev=False)
+	#vox_eval.find_misses(thresh_miss=t_om)
+	#vox_eval.find_vi()
 	skel_eval = SkelEval(gt_block_name, seg_block_name, dsmpl_res=(80,80,80), 
 	                     t_om=t_om, t_m=t_m, t_s=t_s, 
 	                     include_zero_split=False, include_zero_merge=True,
-	                     stage="filtered", overwrite_prev=True)
+	                     stage="tracked-iou-%.2f"%iou_thresh, overwrite_prev=True)
 	skel_eval.merge_oracle()
 	skel_eval.split_oracle()
