@@ -14,6 +14,9 @@ bbox = data_locs["gt"]["8nm-bbox"] # global bbox
 aff_offset = data_locs["aff-offset"] # affinity offset along z-axis
 block_size = 60
 n_blocks = 16
+filter_method = "dsmpl"
+filter_params = {"dsmpl": (4,3,3),
+				 "bvol-thresh": float(block_size)/4*40}
 ###
 
 for wz_id, wz_thresh in enumerate(wz_threshes):
@@ -27,8 +30,7 @@ for wz_id, wz_thresh in enumerate(wz_threshes):
 		print seg_block.shape
 		# Assuming bboxes are generated, proceed to filter
 		seg_block.read_bboxes()
-		filter_params = {"vol-thresh":block_size*20*20, "len-thresh":0.3*block_size}
-		seg_block.find_fiber_ids(params=filter_params) # see function for more details on setting non-default filter method and params
+		seg_block.find_fiber_ids(method=filter_method, params=filter_params) # see function for more details on setting non-default filter method and params
 		seg_block.filter_fibers() # see function for more details on setting non-default filter method and params
 		#seg_block.relabel(use_bboxes=True)
-		seg_block.write(stage="filtered") # this saves your filtered segmentation to the ./segs/<seg_block_name>/ folder
+		seg_block.write(stage="filt-"+filter_method) # this saves your filtered segmentation to the ./segs/<seg_block_name>/ folder
