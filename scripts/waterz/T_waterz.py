@@ -41,7 +41,7 @@ seg_prefix = seg_prefix + '%04d_'%(i*n_slices)
 print 'Will save result to: ', seg_prefix
 waterz.waterz(aff, wz_thresh, merge_function=mf, 
               output_prefix=seg_prefix, return_seg=False,
-              fragments_mask=fragments_mask,
+              fragments_mask=None,
               aff_threshold=[aff_lo,aff_hi], m_history=True)
 wz_time = time.time()-wz_time
 print 'Finished running waterz in %d s'%(wz_time)
