@@ -1,3 +1,7 @@
+"""
+Script to reduce splits in a segmentation block by IoU tracking of fibers
+"""
+
 from cerebellum.data_prep.seg_prep import *
 from cerebellum.error_correction.block_track import *
 
