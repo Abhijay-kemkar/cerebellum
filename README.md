@@ -8,12 +8,13 @@ This repository contains tools to generate segmentation of parallel fibers from 
 ## Getting started
 
 Clone the repository.
+
 ```git clone --recursive https://github.com/srujanm/cerebellum.git```
 
 Clone the [ibex](https://github.com/srujanm/ibex.git) repository which contains skeletonization tools.
 ```
 cd cerebellum/
-git clone --recursive https://github.com/srujanm/cerebellum.git
+git clone --recursive https://github.com/srujanm/ibex.git
 ```
 Follow the installation instructions on the [ibex](https://github.com/srujanm/ibex.git) page.
 
