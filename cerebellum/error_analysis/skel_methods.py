@@ -2,12 +2,12 @@ import numpy as np
 import time
 import json
 
-from id_map import IDmap
+from .id_map import IDmap
 from cerebellum.stats.voxel_stats import get_vols
-from voxel_segeval import VoxEval
+from .voxel_segeval import VoxEval
 
 class NodeAssignment:
-    def __init__(self, gt_skeleton, pred):
+    def __init__(self, gt_skeleton, pred, overlap_allowance):
         """
         Assignment of nodes of a GT skeleton to objects in predicted segmentation
         
@@ -24,8 +24,17 @@ class NodeAssignment:
         n_nodes = nodes.shape[0]
         self.n_nodes = n_nodes
         self.objs = np.zeros(n_nodes)
+        gg = np.mgrid[-overlap_allowance[0]:overlap_allowance[0]+1, -overlap_allowance[1]:overlap_allowance[1]+1, -overlap_allowance[2]:overlap_allowance[2]+1]
+        grid = np.transpose((gg[0].flatten(), gg[1].flatten(), gg[2].flatten()))
+        vol_size = np.array(gt_skeleton.grid_size)
         for i in range(n_nodes):
-            self.objs[i] = pred[tuple(nodes[i,:])]
+            if pred[tuple(nodes[i,:])] != 0:
+                self.objs[i] = pred[tuple(nodes[i,:])]
+            else:
+                nbrs = nodes[i, :] + grid
+                nbrs = nbrs[np.all(nbrs >= 0, axis=1) & np.all(nbrs < vol_size, axis=1), :]
+                ids = pred[nbrs[:, 0], nbrs[:, 1], nbrs[:, 2]]
+                self.objs[i] = np.max(ids)
     
     def get_id_maps(self):
         """Returns ID map from GT skeleton ID -> intersecting pred objects"""
@@ -41,7 +50,7 @@ class SkeletonEvaluation:
                  t_om=0.9, t_m=0.5, t_s=0.8, 
                  include_zero_split=False,
                  include_zero_merge=False,
-                 calc_erl=False):
+                 calc_erl=False, overlap_allowance=np.int32((2, 5, 5))):
         """
         Evaluation of a predicted segmentation w.r.t. GT skeletons
         
@@ -59,6 +68,7 @@ class SkeletonEvaluation:
             t_s (float b/w 0 and 1): split threshold
                 A GT skeleton S is a split if its top predicted label covers <=t_s of its nodes.
                 Higher t_s -> more splits detected
+            overlap_allowance (1D array of size 3 ): this allows some margin to map gt Node to predicted skel
         Attributes:
             title (str)
             n_skels (int): number of skeletons
@@ -122,19 +132,20 @@ class SkeletonEvaluation:
             max_pred = np.max(pred)
             assert len(pred_ids) == max_pred+1
         except:
-            print "Warning! Labels in predicted segmentation are not consecutive. Proceeding anyway"
+            print("Warning! Labels in predicted segmentation are not consecutive. Proceeding anyway")
         self.n_preds = len(pred_ids)
         try:
             assert gt_skeletons[0].grid_size == pred.shape
         except:
-            print "Predicted segmentation and GT skeleton volume have different grid size"
+            print("Predicted segmentation and GT skeleton volume have different grid size")
         self.grid_size = (pred.shape[0], pred.shape[1], pred.shape[2])
-        print 'Starting evaluation of %d labels in %dx%dx%d predicted segmentation against %d GT skeletons'%(self.n_preds, pred.shape[0], pred.shape[1], pred.shape[2], self.n_skels)
+        print('Starting evaluation of %d labels in %dx%dx%d predicted segmentation against %d GT skeletons'%(self.n_preds, pred.shape[0], pred.shape[1], pred.shape[2], self.n_skels))
+        self.overlap_allowance = overlap_allowance
         # error thresholds
         self.t_om = t_om
         self.t_m = t_m
         self.t_s = t_s
-        print 'Using error thresholds: t_om=%.2f, t_m=%.2f, t_s=%.2f'%(t_om, t_m, t_s)
+        print('Using error thresholds: t_om=%.2f, t_m=%.2f, t_s=%.2f'%(t_om, t_m, t_s))
         # main results
         self.categories = [None]*self.n_skels
         self.erl_pred = 0
@@ -149,8 +160,7 @@ class SkeletonEvaluation:
         self.split_list = []
         self.corr_list = []
         # GT to pred ID maps
-        self.gt2pred = [NodeAssignment(gt_skeletons[i], pred).get_id_maps() for i in range(self.n_skels)]
-        
+        self.gt2pred = [NodeAssignment(gt_skeletons[i], pred, self.overlap_allowance).get_id_maps() for i in range(self.n_skels)]
          # go through each skeleton
         for i, sk_outer in enumerate(gt_skeletons):
             # ignore segment 0
@@ -158,8 +168,7 @@ class SkeletonEvaluation:
                 self.categories[i] = "omitted"
                 continue
             # case: omitted
-            omission_flag = (self.gt2pred[i].ids_out[0] == 0
-                              and (1.*self.gt2pred[i].counts_out[0])/self.gt2pred[i].size_in > self.t_om)
+            omission_flag = (self.gt2pred[i].ids_out[0] == 0 and (1.*self.gt2pred[i].counts_out[0])/self.gt2pred[i].size_in > self.t_om)
             if omission_flag:
                 self.categories[i] = "omitted"
                 self.omitted_list.append(i)
@@ -220,7 +229,7 @@ class SkeletonEvaluation:
             self.erl_gt = gt_length/tot_length
             self.trl_gt = tot_length
         
-        print 'Skeleton evaluation time: {}'.format(time.time() - start_time)
+        print('Skeleton evaluation time: {}'.format(time.time() - start_time))
 
     def summary(self, write_path=None):
         n_om = self.categories.count("omitted")
@@ -229,10 +238,10 @@ class SkeletonEvaluation:
         n_h = self.categories.count("hybrid")
         n_c = self.categories.count("correct")
         assert n_om+n_m+n_s+n_c+n_h == self.n_skels
-        print 'Results:\n%d omissions, %d merges, %d splits, %d hybrid, %d correct'%(n_om, n_m, n_s, n_h, n_c)
-        print 'GT ERL: %d, Prediction ERL: %d'%(self.erl_gt, self.erl_pred)
-        print 'GT TRL: %d, Prediction TRL: %d'%(self.trl_gt, self.trl_pred)
-        print 'Omitted RL: %d, Merged RL: %d, Split RL: %d'%(self.omitted_length, self.merged_length, self.split_length)
+        print('Results:\n%d omissions, %d merges, %d splits, %d hybrid, %d correct'%(n_om, n_m, n_s, n_h, n_c))
+        print('GT ERL: %d, Prediction ERL: %d'%(self.erl_gt, self.erl_pred))
+        print('GT TRL: %d, Prediction TRL: %d'%(self.trl_gt, self.trl_pred))
+        print('Omitted RL: %d, Merged RL: %d, Split RL: %d'%(self.omitted_length, self.merged_length, self.split_length))
         if write_path is not None:
             cat_counts = {
                 "thresholds":{

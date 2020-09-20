@@ -43,7 +43,7 @@ class SkelEval(object):
         self.sk_eval = None
 
         if not os.path.exists(self.results_folder+'/skeleton-analysis-summary.json') or overwrite_prev:
-            print "Starting error analysis of " + pred_name + " against skeletons of " + gt_name
+            print("Starting error analysis of " + pred_name + " against skeletons of " + gt_name)
             self.sk_eval = SkeletonEvaluation(self.pred_name, self.gt_skeletons, self.pred, 
                                                 t_om=t_om, t_m=t_m, t_s=t_s, 
                                                 include_zero_split=include_zero_split,
@@ -55,7 +55,7 @@ class SkelEval(object):
             log.write("completed error analysis against skeletons of " + gt_name + "\n\n")
             log.close()
         else:
-            print "Skeleton-based error analysis of " + pred_name + " was already completed"
+            print("Skeleton-based error analysis of " + pred_name + " was already completed")
 
     def get_merges(self, look_in="pred"):
         """
@@ -66,7 +66,7 @@ class SkelEval(object):
         """
         merge_file = self.results_folder + "/merged-skeletons.ids"
         if not os.path.exists(merge_file):
-            print "Error retrieving IDs because skeleton evaluation has not been run yet"
+            print("Error retrieving IDs because skeleton evaluation has not been run yet")
             return
         else:
             f = open(merge_file, "r")
@@ -83,7 +83,7 @@ class SkelEval(object):
                     merge_ids[2*i] = int(mstr.split(',')[0])
                     merge_ids[2*i+1] = int(mstr.split(',')[1])
             else:
-                print "Error: look_in must equal either 'gt' or 'pred'"
+                print("Error: look_in must equal either 'gt' or 'pred'")
                 return
             merge_ids = list(set(merge_ids))
             return merge_ids
@@ -92,7 +92,7 @@ class SkelEval(object):
         """Returns list of object IDs identified as correct in skeleton-based error analysis"""
         corr_file = self.results_folder + "/correct-skeletons.ids"
         if not os.path.exists(corr_file):
-            print "Error retrieving IDs because skeleton evaluation has not been run yet"
+            print("Error retrieving IDs because skeleton evaluation has not been run yet")
             return
         f = open(corr_file, "r")
         n_corr = int(f.readline()) # no of pairs of GT merged skeletons
@@ -109,7 +109,7 @@ class SkelEval(object):
     def get_splits(self, look_in="pred"):
         split_file = self.results_folder + "/split-skeletons.ids"
         if not os.path.exists(split_file):
-            print "Error retrieving IDs because skeleton evaluation has not been run yet"
+            print("Error retrieving IDs because skeleton evaluation has not been run yet")
             return
         else:
             f = open(split_file, "r")
@@ -128,7 +128,7 @@ class SkelEval(object):
                     for seg_id in seg_strs:
                         split_ids.append(int(seg_id))
             else:
-                print "Error: look_in must equal either 'gt' or 'pred'"
+                print("Error: look_in must equal either gt or pred")
                 return
             split_ids = list(set(split_ids))
             return split_ids
@@ -143,12 +143,12 @@ class SkelEval(object):
         else:
             vox_eval = VoxEval(self.gt_name, self.pred_name, stage=self.stage)
         vi = vox_eval.get_vi()
-        print "Original VI split, VI merge: %f, %f"%(vi[0], vi[1])
+        print("Original VI split, VI merge: %f, %f"%(vi[0], vi[1]))
         fix_ids = self.get_merges(look_in="gt")
         vox_eval.remove_from_gt(vox_eval.missing_objs)
-        print "After fixing %d merges in GT flagged by skeleton analysis:"%(len(fix_ids))
-        print calc_vi(vox_eval.gt, vox_eval.pred, fix_ids=fix_ids, do_save=True, 
-                      write_file=self.results_folder+'/vi-merge-oracle.json')
+        print("After fixing %d merges in GT flagged by skeleton analysis:"%(len(fix_ids)))
+        print(calc_vi(vox_eval.gt, vox_eval.pred, fix_ids=fix_ids, do_save=True, 
+                      write_file=self.results_folder+'/vi-merge-oracle.json'))
 
     def split_oracle(self):
         """Computes VI after fixing splits from skeleton error analysis"""
@@ -157,12 +157,12 @@ class SkelEval(object):
         else:
             vox_eval = VoxEval(self.gt_name, self.pred_name, stage=self.stage)
         vi = vox_eval.get_vi()
-        print "Original VI split, VI merge: %f, %f"%(vi[0], vi[1])
+        print("Original VI split, VI merge: %f, %f"%(vi[0], vi[1]))
         fix_ids = self.get_splits(look_in="gt")
         vox_eval.remove_from_gt(vox_eval.missing_objs)
-        print "After fixing %d splits in GT flagged by skeleton analysis:"%(len(fix_ids))
-        print calc_vi(vox_eval.gt, vox_eval.pred, fix_ids=fix_ids, do_save=True, 
-                      write_file=self.results_folder+'/vi-split-oracle.json')
+        print("After fixing %d splits in GT flagged by skeleton analysis:"%(len(fix_ids)))
+        print(calc_vi(vox_eval.gt, vox_eval.pred, fix_ids=fix_ids, do_save=True, 
+                      write_file=self.results_folder+'/vi-split-oracle.json'))
 
     def pr_analysis(self, detected_ids, type, write_path=None):
         """
@@ -173,21 +173,21 @@ class SkelEval(object):
         elif type=="split":
             analysis_ids = self.get_splits(look_in="pred")
         corr_ids = self.get_corrects(look_in="pred")
-        print "Benchmarking against %d error IDs and %d correct IDs"%(len(analysis_ids), len(corr_ids))
-        true_pos = list(set(analysis_ids)&(set(detected_ids)))
-        print "True positives: %d"%(len(true_pos))
+        print("Benchmarking against %d error IDs and %d correct IDs"%(len(analysis_ids), len(corr_ids))
+        true_pos = list(set(analysis_ids)&(set(detected_ids))))
+        print("True positives: %d"%(len(true_pos)))
         false_pos = list(set(corr_ids)&(set(detected_ids)))
-        print "False positives: %d"%(len(false_pos))
+        print("False positives: %d"%(len(false_pos)))
         true_neg = list(set(corr_ids).difference(set(detected_ids)))
-        print "True negatives: %d"%(len(true_neg))
+        print("True negatives: %d"%(len(true_neg)))
         false_neg = list(set(analysis_ids).difference(set(detected_ids)))
-        print "False negatives: %d"%(len(false_neg))
+        print("False negatives: %d"%(len(false_neg)))
         precision = len(true_pos)/(1.*len(true_pos)+len(false_pos))
         recall = len(true_pos)/(1.*len(true_pos)+len(false_neg))
-        print "Precision: %f"%(precision)
-        print "Recall: %f"%(recall)
-        print "False pos:", false_pos
-        print "False neg:", false_neg
+        print("Precision: %f"%(precision))
+        print("Recall: %f"%(recall))
+        print("False pos:", false_pos)
+        print("False neg:", false_neg)
         if write_path is not None:
             np.save(write_path+'false_pos', false_pos)
             np.save(write_path+'false_neg', false_neg)

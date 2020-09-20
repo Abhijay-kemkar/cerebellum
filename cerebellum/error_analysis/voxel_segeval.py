@@ -1,7 +1,7 @@
 import json
 import matplotlib.pyplot as plt
 
-from voxel_methods import *
+from .voxel_methods import *
 from cerebellum.utils.data_io import *
 
 class VoxEval(object):
@@ -34,7 +34,7 @@ class VoxEval(object):
         self.vi = read_json(self.results_folder+'/vi.json')
         self.iou_results = read_npy(self.results_folder+'/iou_results.npy')
         self.delta_vis = read_npy(self.results_folder+'/vi_scores.npy')
-        print "Starting voxel evaluation methods for " + pred_name + " against " + gt_name
+        print("Starting voxel evaluation methods for " + pred_name + " against " + gt_name)
         if self.missing_objs is None:
             if stage is not None:
                 create_folder('./err-analysis/' + pred_name)
@@ -53,7 +53,7 @@ class VoxEval(object):
         self.missing_objs = pred_fails(self.gt, self.pred, thresh_miss=thresh_miss,
                                         do_save=True, 
                                         write_file=self.results_folder+'/missing-objs')
-        print "Found %d GT objects completely missing"%(self.missing_objs.size)
+        print("Found %d GT objects completely missing"%(self.missing_objs.size))
         self.remove_from_gt(self.missing_objs.tolist())
         log = open("./logs/" + self.pred_name +'.log', "a+")
         log.write("missing object count\n")
@@ -64,7 +64,7 @@ class VoxEval(object):
         """finds VI of pred against GT"""
         self.remove_from_gt(self.missing_objs.tolist())
         self.vi = calc_vi(self.gt, self.pred, do_save=True, write_file=self.results_folder+'/vi.json')
-        print "VI split, VI merge: %f, %f"%(self.vi[0], self.vi[1])
+        print("VI split, VI merge: %f, %f"%(self.vi[0], self.vi[1]))
         log = open("./logs/" + self.pred_name +'.log', "a+")
         log.write("VI calculation completed\n")
         log.write("%f, %f\n"%(self.vi[0], self.vi[1]))
@@ -83,7 +83,7 @@ class VoxEval(object):
                                      write_file=self.results_folder+"/iou_results")
         iou_scores = self.iou_results[2,:]
         print_count = np.count_nonzero(iou_scores>print_thresh)
-        print "found %d objects with IoU score below %f"%(print_count, print_thresh)
+        print("found %d objects with IoU score below %f"%(print_count, print_thresh))
         if show_hist:
             plt.hist(x=iou_scores[1:], bins=10) # remove segment 0
             plt.xlabel('IoU')
@@ -163,7 +163,7 @@ class VoxEval(object):
         fig.set_size_inches(16, 6)
         plt.savefig(self.results_folder+'/deltaVI_merge.png', bbox_inches="tight")
         plt.close()
-        print "Delta VI histogram plots generated and saved"
+        print("Delta VI histogram plots generated and saved")
 
     def run_fullsuite(self, thresh_miss=0, iou_max=0.7, hist_segs=10, overwrite_prev=False):
         """
@@ -174,25 +174,25 @@ class VoxEval(object):
             overwrite_prev (bool): overwrite previous results if any
         """
         if self.missing_objs is None or overwrite_prev:
-            print "Starting missing object evaluation"
+            print("Starting missing object evaluation")
             self.find_misses(thresh_miss=thresh_miss)
         else:
-            print "Missing object results loaded"
+            print("Missing object results loaded")
         if self.vi is None or overwrite_prev:
-            print "Starting VI evaluation"
+            print("Starting VI evaluation")
             self.find_vi()
         else:
-            print "VI loaded"
+            print("VI loaded")
         if self.iou_results is None or overwrite_prev:
-            print "Starting IoU evaluation"
+            print("Starting IoU evaluation")
             self.find_ious(print_thresh=iou_max)
         else:
-            print "IoU results loaded"
+            print("IoU results loaded")
         if self.delta_vis is None or overwrite_prev:
-            print "Starting delta VI evaluation"
+            print("Starting delta VI evaluation")
             self.find_delta_vis(iou_max=iou_max)
         else:
-            print "delta_VI results loaded"
+            print("delta_VI results loaded")
         self.gen_vi_histograms(hist_segs=hist_segs)
 
     def get_vi(self):
@@ -200,4 +200,4 @@ class VoxEval(object):
         try:
             return (self.vi["VI split"], self.vi["VI merge"])
         except:
-            print "Error retrieving VI because VI calculation has not been run yet"
+            print("Error retrieving VI because VI calculation has not been run yet")

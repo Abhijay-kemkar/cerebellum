@@ -2,7 +2,7 @@ import numpy as np
 import h5py
 import time
 import json
-from em_segLib.seg_eval import CremiEvaluate
+# from em_segLib.seg_eval import CremiEvaluate
 
 from cerebellum.stats.voxel_stats import get_vols
 
@@ -99,7 +99,7 @@ def iou_rank(seg_gt, seg_p, skip_ids=[], Ngt=None, Vmin=0, do_save=False, write_
     for i in skip_ids:
         id_calc = np.delete(id_calc, np.where(id_calc==i))
     num_calc = len(id_calc)
-    print "Calculating IoU scores for %d objects in GT" %(len(id_calc))
+    print("Calculating IoU scores for %d objects in GT" %(len(id_calc)))
     iou = np.zeros(num_calc)
     best_pred = np.zeros(num_calc)
     for i in range(num_calc):
@@ -110,7 +110,7 @@ def iou_rank(seg_gt, seg_p, skip_ids=[], Ngt=None, Vmin=0, do_save=False, write_
         best_pred[i] = pred_ids[0]
         iou[i] = float(pred_vols[0])/union_count(seg_gt,seg_p,id_calc[i],pred_ids[0]) # IoU with best overlapping object
         numV = float(sum(pred_vols))
-        print id_calc[i]
+        print(id_calc[i])
     # sort GT objects in ascending order of IoU score
     iou_sort = np.argsort(iou)
     id_calc = id_calc[iou_sort]
@@ -136,7 +136,7 @@ def slice_iou(source_slice, target_slice):
     start_time = time.time()
     good_labels = np.max(source_slice)==len(get_vols(source_slice)[0])-1
     if not good_labels:
-    	raise RuntimeError('Labels in source slice are not ordered. Relabel and try again')
+        raise RuntimeError('Labels in source slice are not ordered. Relabel and try again')
     else:
         n_objs = np.max(source_slice)
         ints = np.zeros(n_objs)
@@ -150,76 +150,76 @@ def slice_iou(source_slice, target_slice):
             ints[i] = front_vols[0]
             unions[i], orders[i] = union_count(source_slice, target_slice, i, front_ids[0], return_order=True)
             ious[i] = float(ints[i])/unions[i]
-    	return ints, unions, ious, orders, time.time()-start_time
+        return ints, unions, ious, orders, time.time()-start_time
 
-def calc_vi(seg_gt, seg_p, fix_ids=None, do_save=False, write_file=""):
-    """
-    Calculates VI between two segmentations
+# def calc_vi(seg_gt, seg_p, fix_ids=None, do_save=False, write_file=""):
+#     """
+#     Calculates VI between two segmentations
     
-    Args:
-        seg_gt (ndarray): GT segmentation
-        seg_p (ndarray): predicted segmentation
-        fix_ids (list of ints): apply oracle to these IDs in GT segmentation
-        do_save (bool): flag to save results
-        write_file (str): path for result .json file
-    Returns:
-        vi_split_oracle, vi_merge_oracle
-    """
-    seg_oracle = seg_p.copy()
-    if fix_ids is not None:
-        max_id = np.max(seg_p) + 1
-        for i in range(len(fix_ids)):
-            seg_oracle[seg_gt==fix_ids[i]] = max_id # oracle for this GT object
-            max_id += 1
-    vi_split_oracle, vi_merge_oracle = CremiEvaluate(seg_oracle.astype(np.int), seg_gt.astype(np.int))
-    del seg_oracle
-    if do_save:
-        vi_dict = {"VI split": vi_split_oracle, "VI merge": vi_merge_oracle}
-        with open(write_file, 'w') as out:
-                json.dump(vi_dict, out)
-    return vi_split_oracle, vi_merge_oracle
+#     Args:
+#         seg_gt (ndarray): GT segmentation
+#         seg_p (ndarray): predicted segmentation
+#         fix_ids (list of ints): apply oracle to these IDs in GT segmentation
+#         do_save (bool): flag to save results
+#         write_file (str): path for result .json file
+#     Returns:
+#         vi_split_oracle, vi_merge_oracle
+#     """
+#     seg_oracle = seg_p.copy()
+#     if fix_ids is not None:
+#         max_id = np.max(seg_p) + 1
+#         for i in range(len(fix_ids)):
+#             seg_oracle[seg_gt==fix_ids[i]] = max_id # oracle for this GT object
+#             max_id += 1
+#     vi_split_oracle, vi_merge_oracle = CremiEvaluate(seg_oracle.astype(np.int), seg_gt.astype(np.int))
+#     del seg_oracle
+#     if do_save:
+#         vi_dict = {"VI split": vi_split_oracle, "VI merge": vi_merge_oracle}
+#         with open(write_file, 'w') as out:
+#                 json.dump(vi_dict, out)
+#     return vi_split_oracle, vi_merge_oracle
 
-def vi_rank(seg_gt, seg_p, iou_results, iou_max=0.7, do_save=False, write_file=""):
-    """
-    Ranks GT segments in order of their contribution to VI error
+# def vi_rank(seg_gt, seg_p, iou_results, iou_max=0.7, do_save=False, write_file=""):
+#     """
+#     Ranks GT segments in order of their contribution to VI error
 
-    Calculates deltaVI by applying an oracle for each segment
-    VI calculation function is CremiEvaluate
-    Args:
-        seg_gt (ndarray): GT segmentation
-        seg_p (ndarray): predicted segmentation
-        iou_results (ndarray): results from IoU_rank function
-        iou_max (float): ignore GT segments whose IoU score is higher than this
-        do_save (bool): flag to save results
-        write_file (str): path for result file
-    Returns:
-        id_calc (nx, ndarray), deltaVI (nx2 ndarray): (VI split, VI merge)
-    """
-    gt_ids, iou_scores = iou_results[0,:], iou_results[1,:]
-    vi_split, vi_merge = CremiEvaluate(seg_p.astype(np.int), seg_gt.astype(np.int))
-    print 'VI-split: %1.5f' %(vi_split)
-    print 'VI-merge: %1.5f' %(vi_merge)
-    id_calc = []
-    deltaVI = []
-    max_id = np.max(seg_gt) + 1
-    for i in range(len(gt_ids)):
-        if iou_scores[i] > iou_max:
-            continue
-        seg_oracle = seg_p.copy()
-        seg_oracle[seg_gt==gt_ids[i]] = max_id # oracle for this GT object
-        vi_split_oracle, vi_merge_oracle = CremiEvaluate(seg_oracle.astype(np.int), seg_gt.astype(np.int)) 
-        delta_vi = [vi_split-vi_split_oracle, vi_merge-vi_merge_oracle]
-        print 'Label %9d in GT --> delta VI split %1.5f, delta VI merge %1.5f' %(gt_ids[i],delta_vi[0],delta_vi[1])
-        id_calc.append(gt_ids[i])
-        deltaVI.append(delta_vi)
-        del seg_oracle
-    id_calc = np.array(id_calc)
-    deltaVI = np.array(deltaVI)
-    deltaVI_tot = deltaVI[:,0] + deltaVI[:,1] # sum of split and merge
-    sortbyVI = np.argsort(-deltaVI_tot)
-    id_calc = id_calc[sortbyVI] # sort in descending order of error
-    deltaVI = deltaVI[sortbyVI,:]
-    if do_save:
-        results = np.vstack((id_calc, deltaVI.transpose()))
-        np.save(write_file, results)
-    return results
+#     Calculates deltaVI by applying an oracle for each segment
+#     VI calculation function is CremiEvaluate
+#     Args:
+#         seg_gt (ndarray): GT segmentation
+#         seg_p (ndarray): predicted segmentation
+#         iou_results (ndarray): results from IoU_rank function
+#         iou_max (float): ignore GT segments whose IoU score is higher than this
+#         do_save (bool): flag to save results
+#         write_file (str): path for result file
+#     Returns:
+#         id_calc (nx, ndarray), deltaVI (nx2 ndarray): (VI split, VI merge)
+#     """
+#     gt_ids, iou_scores = iou_results[0,:], iou_results[1,:]
+#     vi_split, vi_merge = CremiEvaluate(seg_p.astype(np.int), seg_gt.astype(np.int))
+#     print('VI-split: %1.5f' %(vi_split))
+#     print('VI-merge: %1.5f' %(vi_merge))
+#     id_calc = []
+#     deltaVI = []
+#     max_id = np.max(seg_gt) + 1
+#     for i in range(len(gt_ids)):
+#         if iou_scores[i] > iou_max:
+#             continue
+#         seg_oracle = seg_p.copy()
+#         seg_oracle[seg_gt==gt_ids[i]] = max_id # oracle for this GT object
+#         vi_split_oracle, vi_merge_oracle = CremiEvaluate(seg_oracle.astype(np.int), seg_gt.astype(np.int)) 
+#         delta_vi = [vi_split-vi_split_oracle, vi_merge-vi_merge_oracle]
+#         print('Label %9d in GT --> delta VI split %1.5f, delta VI merge %1.5f' %(gt_ids[i],delta_vi[0],delta_vi[1]))
+#         id_calc.append(gt_ids[i])
+#         deltaVI.append(delta_vi)
+#         del seg_oracle
+#     id_calc = np.array(id_calc)
+#     deltaVI = np.array(deltaVI)
+#     deltaVI_tot = deltaVI[:,0] + deltaVI[:,1] # sum of split and merge
+#     sortbyVI = np.argsort(-deltaVI_tot)
+#     id_calc = id_calc[sortbyVI] # sort in descending order of error
+#     deltaVI = deltaVI[sortbyVI,:]
+#     if do_save:
+#         results = np.vstack((id_calc, deltaVI.transpose()))
+#         np.save(write_file, results)
+#     return results
